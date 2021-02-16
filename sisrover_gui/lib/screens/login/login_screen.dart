@@ -73,6 +73,16 @@ class _MyHomePageState extends State<MyHomePage> {
                       ],
                     ),
                   ),
+                  TextButton(
+                    onPressed: null, //TODO
+                    child: Text(
+                      "Change Password?",
+                      style: TextStyle(
+                        color: Colors.black,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             )
