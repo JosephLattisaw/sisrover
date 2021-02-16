@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 project(runner LANGUAGES CXX)
 
-set(BINARY_NAME "sisrover_gui")
-set(APPLICATION_ID "com.example.sisrover_gui")
+set(BINARY_NAME "xscan")
+set(APPLICATION_ID "com.example.xscan")
 
 cmake_policy(SET CMP0063 NEW)
 
