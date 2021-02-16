@@ -23,6 +23,17 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  file_selector_platform_interface: ^1.0.2
+  file_selector_linux:
+    git:
+      url: git://github.com/google/flutter-desktop-embedding.git
+      path: plugins/file_selector/file_selector_linux
+      ref: fd519be1e8398c6b6c2062c2447bac960a71bc02
+  window_size:
+    git:
+      url: git://github.com/google/flutter-desktop-embedding.git
+      path: plugins/window_size
+      ref: fd519be1e8398c6b6c2062c2447bac960a71bc02
 
 
   # The following adds the Cupertino Icons font to your application.
