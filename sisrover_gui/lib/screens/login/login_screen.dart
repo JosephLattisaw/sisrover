@@ -27,6 +27,8 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  bool showPassword = false;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -38,7 +40,7 @@ class _MyHomePageState extends State<MyHomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              height: 200,
+              height: 400,
               decoration: BoxDecoration(
                 border: Border.all(
                   color: Colors.black,
@@ -82,6 +84,16 @@ class _MyHomePageState extends State<MyHomePage> {
                         decoration: TextDecoration.underline,
                       ),
                     ),
+                  ),
+                  CheckboxListTile(
+                    title: Text("Show Password"),
+                    value: showPassword,
+                    onChanged: (value) {
+                      setState(() {
+                        showPassword = value;
+                      });
+                    },
+                    controlAffinity: ListTileControlAffinity.leading,
                   ),
                 ],
               ),
