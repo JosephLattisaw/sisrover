@@ -35,6 +35,16 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
+      bottomNavigationBar: Container(
+        child: Text(
+          "Smart Imaging Systems, Inc. © 2016 All Rights Reserved.",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 15.0,
+          ),
+        ),
+        color: Colors.blue,
+      ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
