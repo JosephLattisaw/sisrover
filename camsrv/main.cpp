@@ -1,5 +1,6 @@
 #include <iostream>
 #include <boost/program_options.hpp>
+#include "controller.hpp"
 
 #define MIN_PORT 2000
 #define MAX_PORT 65536
@@ -144,4 +145,8 @@ int main(int argc, char **argv)
             std::exit(EXIT_FAILURE);
         }
     }
+
+    std::make_unique<Controller>();
+
+    return 0;
 }
