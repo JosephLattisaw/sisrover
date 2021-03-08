@@ -2,8 +2,8 @@
 #define server__HPP
 
 class Server {
- public:
-  Server();
+public:
+    Server();
 };
 
 #endif

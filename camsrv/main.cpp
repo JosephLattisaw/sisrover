@@ -90,16 +90,22 @@ int main(int argc, char **argv) {
     desc.add_options()(get_option_handles(OPTIONS::HELP).c_str(),
                        get_options_description(OPTIONS::HELP).c_str())(
         get_option_handles(OPTIONS::VERSION).c_str(),
-        get_options_description(OPTIONS::VERSION).c_str())(
-        get_option_handles(OPTIONS::DEVICE_NAME).c_str(),
-        prog_opts::value<decltype(device_name)>(&device_name),
-        get_options_description(OPTIONS::DEVICE_NAME).c_str())(
-        get_option_handles(OPTIONS::PORT).c_str(),
-        prog_opts::value<decltype(port_number)>(&port_number),
-        get_options_description(OPTIONS::PORT).c_str())(
-        get_option_handles(OPTIONS::URL).c_str(),
-        prog_opts::value<decltype(url)>(&url),
-        get_options_description(OPTIONS::URL).c_str());
+        get_options_description(OPTIONS::VERSION)
+            .c_str())(get_option_handles(OPTIONS::DEVICE_NAME).c_str(),
+                      prog_opts::value<decltype(device_name)>(&device_name),
+                      get_options_description(OPTIONS::DEVICE_NAME)
+                          .c_str())(get_option_handles(OPTIONS::PORT).c_str(),
+                                    prog_opts::value<decltype(port_number)>(
+                                        &port_number),
+                                    get_options_description(OPTIONS::PORT)
+                                        .c_str())(get_option_handles(
+                                                      OPTIONS::URL)
+                                                      .c_str(),
+                                                  prog_opts::value<
+                                                      decltype(url)>(&url),
+                                                  get_options_description(
+                                                      OPTIONS::URL)
+                                                      .c_str());
 
     prog_opts::variables_map vars_map;
     prog_opts::store(prog_opts::parse_command_line(argc, argv, desc), vars_map);
