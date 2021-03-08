@@ -15,13 +15,16 @@ const std::string OPTIONS_DESCRIPTION = "Options";
 const int OPTION_HANDLES_COMBO = 2;
 
 // OPTIONS
-const std::array<const std::array<std::string, 3>, 5> OPTIONS_HANDLE = {{
-    {"help", "h", "Displays this help."},
-    {"version", "v", "Displays version information"},
-    {"device_name", "d", "Device name/path for a camera (e.g. /dev/video0)"},
-    {"port", "p", "TCP/IP port for server to listen on."},
-    {"url", "u", "URL for RTSP to IP Camera."},
-}};
+const int OPTIONS_NUMBER_PARAMS = 3;
+const int OPTIONS_NUMBER_ELEMENTS = 5;
+const std::array<const std::array<std::string, OPTIONS_NUMBER_PARAMS>, OPTIONS_NUMBER_ELEMENTS>
+    OPTIONS_HANDLE = {{
+        {"help", "h", "Displays this help."},
+        {"version", "v", "Displays version information"},
+        {"device_name", "d", "Device name/path for a camera (e.g. /dev/video0)"},
+        {"port", "p", "TCP/IP port for server to listen on."},
+        {"url", "u", "URL for RTSP to IP Camera."},
+    }};
 
 enum OPTIONS {
     HELP = 0,
@@ -44,8 +47,7 @@ std::string get_option_handles(OPTIONS index) {
 
     try {
         auto opt_h = OPTIONS_HANDLE.at(index);
-        res = opt_h.at(OPTION_HANDLES::HANDLE) + "," +
-              opt_h.at(OPTION_HANDLES::SHORT_HANDLE);
+        res = opt_h.at(OPTION_HANDLES::HANDLE) + "," + opt_h.at(OPTION_HANDLES::SHORT_HANDLE);
     } catch (std::out_of_range const &exc) {
         std::cout << __PRETTY_FUNCTION__ << ", index: " << index << std::endl;
         throw;
@@ -54,8 +56,7 @@ std::string get_option_handles(OPTIONS index) {
     return res;
 }
 
-std::string get_option_handle(OPTIONS options_index,
-                              OPTION_HANDLES handle_index) {
+std::string get_option_handle(OPTIONS options_index, OPTION_HANDLES handle_index) {
     std::string res;
     try {
         auto opt_h = OPTIONS_HANDLE.at(options_index);
@@ -95,17 +96,11 @@ int main(int argc, char **argv) {
                       prog_opts::value<decltype(device_name)>(&device_name),
                       get_options_description(OPTIONS::DEVICE_NAME)
                           .c_str())(get_option_handles(OPTIONS::PORT).c_str(),
-                                    prog_opts::value<decltype(port_number)>(
-                                        &port_number),
+                                    prog_opts::value<decltype(port_number)>(&port_number),
                                     get_options_description(OPTIONS::PORT)
-                                        .c_str())(get_option_handles(
-                                                      OPTIONS::URL)
-                                                      .c_str(),
-                                                  prog_opts::value<
-                                                      decltype(url)>(&url),
-                                                  get_options_description(
-                                                      OPTIONS::URL)
-                                                      .c_str());
+                                        .c_str())(get_option_handles(OPTIONS::URL).c_str(),
+                                                  prog_opts::value<decltype(url)>(&url),
+                                                  get_options_description(OPTIONS::URL).c_str());
 
     prog_opts::variables_map vars_map;
     prog_opts::store(prog_opts::parse_command_line(argc, argv, desc), vars_map);
@@ -126,10 +121,9 @@ int main(int argc, char **argv) {
     bool url_set = vars_map.count(get_options_long_handle(OPTIONS::URL));
 
     if (dev_set && url_set) {
-        std::cout
-            << "you can only select one or the other, device stream or url "
-               "stream, not both"
-            << std::endl;
+        std::cout << "you can only select one or the other, device stream or url "
+                     "stream, not both"
+                  << std::endl;
         std::exit(EXIT_FAILURE);
     } else if (!dev_set && !url_set) {
         std::cout << "no device node or url was selected" << std::endl;
@@ -139,8 +133,7 @@ int main(int argc, char **argv) {
         std::exit(EXIT_FAILURE);
     } else {
         if ((port_number < MIN_PORT) || (port_number > MAX_PORT)) {
-            std::cout << "port range must be within " << MIN_PORT << " - "
-                      << MAX_PORT << std::endl;
+            std::cout << "port range must be within " << MIN_PORT << " - " << MAX_PORT << std::endl;
             std::exit(EXIT_FAILURE);
         }
     }

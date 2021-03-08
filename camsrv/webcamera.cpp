@@ -24,8 +24,7 @@ void WebCamera::open_dev() {
 
     struct stat f_stat;
     if (stat(dev_nm.c_str(), &f_stat) == -1) {
-        std::cout << "can't identify " << dev_nm << errno << strerror(errno)
-                  << std::endl;
+        std::cout << "can't identify " << dev_nm << errno << strerror(errno) << std::endl;
         std::exit(EXIT_FAILURE);
     } else if (!S_ISCHR(f_stat.st_mode)) {
         std::cout << dev_nm << "is not a device" << std::endl;
@@ -69,8 +68,7 @@ void WebCamera::init_dev() {
     bool mjpeg_found = false;
     fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     while (xioctl(VIDIOC_ENUM_FMT, &fmtdesc) == 0) {
-        std::cout << "found format: "
-                  << reinterpret_cast<char *>(&fmtdesc.description)
+        std::cout << "found format: " << reinterpret_cast<char *>(&fmtdesc.description)
                   << std::endl;
         if (fmtdesc.pixelformat == V4L2_PIX_FMT_MJPEG) {
             mjpeg_found = true;
@@ -80,8 +78,7 @@ void WebCamera::init_dev() {
     }
 
     if (!mjpeg_found) {
-        std::cout << dev_nm << " does not appear to be a mjpeg device"
-                  << std::endl;
+        std::cout << dev_nm << " does not appear to be a mjpeg device" << std::endl;
         std::exit(EXIT_FAILURE);
     }
 
@@ -108,8 +105,7 @@ void WebCamera::init_dev() {
 
     while (xioctl(VIDIOC_ENUM_FRAMEINTERVALS, &frmivalenum) == 0) {
         if (frmivalenum.type == V4L2_FRMIVAL_TYPE_DISCRETE) {
-            auto fps = 1.0 * frmivalenum.discrete.denominator /
-                       frmivalenum.discrete.numerator;
+            auto fps = 1.0 * frmivalenum.discrete.denominator / frmivalenum.discrete.numerator;
             if (frmivalenum.discrete.numerator != 1) {
                 std::cout << "unsupported numerator in framerate" << std::endl;
                 std::exit(EXIT_FAILURE);
@@ -120,8 +116,7 @@ void WebCamera::init_dev() {
         frmivalenum.index++;
     }
 
-    std::cout << "found lowest supported framerate " << fps_denominator
-              << std::endl;
+    std::cout << "found lowest supported framerate " << fps_denominator << std::endl;
 
     // setting framerate
     CLEAR(streamparm);
@@ -158,8 +153,7 @@ void WebCamera::init_mmap() {
     requestbuffers.memory = V4L2_MEMORY_MMAP;
 
     if (xioctl(VIDIOC_REQBUFS, &requestbuffers) == -1) {
-        std::cout << "error: " << dev_nm << " does not support memory mapping"
-                  << std::endl;
+        std::cout << "error: " << dev_nm << " does not support memory mapping" << std::endl;
         std::exit(EXIT_FAILURE);
         int joe;
     }
@@ -177,8 +171,8 @@ void WebCamera::init_mmap() {
     }
 
     buf_size = buffer.length;
-    auto res = mmap(NULL, buf_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                    file_dscrptr, buffer.m.offset);
+    auto res =
+        mmap(NULL, buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, file_dscrptr, buffer.m.offset);
 
     if (res == MAP_FAILED) {
         std::cout << "error: mapping failed" << std::endl;
