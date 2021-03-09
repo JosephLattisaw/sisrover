@@ -1,3 +1,4 @@
+#include <boost/asio.hpp>
 #include <boost/program_options.hpp>
 #include <iostream>
 
@@ -156,8 +157,12 @@ int main(int argc, char **argv) {
         }
     }
 
+    boost::asio::io_service io_service;
+
     // creating our camsrv object
-    std::make_unique<Controller>(device_name, port_number, url);
+    auto controller = std::make_unique<Controller>(device_name, port_number, url, io_service);
+
+    io_service.run();
 
     return 0;
 }
