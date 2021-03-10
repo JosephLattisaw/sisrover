@@ -7,9 +7,14 @@
 // True:
 #define REQUEST_STREAMING_OVER_TCP False
 
-static unsigned rtspClientCount =
-    0;  // Counts how many streams (i.e., "RTSPClient"s) are currently in use.
-static char eventLoopWatchVariable = 0;
+#define RTSP_CLIENT_VERBOSITY_LEVEL 1  // by default, print verbose output from each "RTSPClient"
+#define DEBUG_PRINT_EACH_RECEIVED_FRAME 0
+#define DEFAULT_SOCKET_NUMBER_TO_SERVER -1
+
+// Counts how many streams (i.e., "RTSPClient"s) are currently in use.
+static unsigned rtsp_client_count = 0;
+
+static char event_loop_watch_variable = 0;
 std::shared_ptr<IPCamera> ipcamera_obj;
 
 // Define a class to hold per-stream state that we maintain throughout each stream's lifetime:
@@ -18,10 +23,10 @@ public:
     StreamClientState();
     virtual ~StreamClientState();
 
-    MediaSubsessionIterator *iter;
+    MediaSubsessionIterator *iterator;
     MediaSession *session;
     MediaSubsession *subsession;
-    TaskToken streamTimerTask;
+    TaskToken stream_timer_task;
     double duration;
 };
 
@@ -33,18 +38,18 @@ public:
 // "StreamClientState" field to the subclass:
 class ourRTSPClient : public RTSPClient {
 public:
-    static ourRTSPClient *createNew(UsageEnvironment &env, char const *rtspURL,
-                                    int verbosityLevel = 0, char const *applicationName = nullptr,
-                                    portNumBits tunnelOverHTTPPortNum = 0);
+    static ourRTSPClient *create_new(UsageEnvironment &environment, char const *rtsp_url,
+                                     int verbosity_level = 0,
+                                     char const *application_name = nullptr,
+                                     portNumBits tunnel_over_http_port_num = 0);
 
 protected:
-    ourRTSPClient(UsageEnvironment &env, char const *rtspURL, int verbosityLevel,
-                  char const *applicationName, portNumBits tunnelOverHTTPPortNum);
+    ourRTSPClient(UsageEnvironment &environment, char const *rtsp_url, int verbosity_level,
+                  char const *application_name, portNumBits tunnel_over_http_port_num);
     // called only by createNew();
-    virtual ~ourRTSPClient();
 
 public:
-    StreamClientState scs;
+    StreamClientState stream_client_state;
 };
 
 // Define a data sink (a subclass of "MediaSink") to receive the data for each subsession (i.e.,
@@ -54,62 +59,63 @@ public:
 // however, we define a simple 'dummy' sink that receives incoming data, but does nothing with it.
 class DummySink : public MediaSink {
 public:
-    static DummySink *createNew(
-        UsageEnvironment &env,
-        MediaSubsession &subsession,      // identifies the kind of data that's being received
-        char const *streamId = nullptr);  // identifies the stream itself (optional)
+    static DummySink *create_new(
+        UsageEnvironment &environment,
+        MediaSubsession &subsession,       // identifies the kind of data that's being received
+        char const *stream_id = nullptr);  // identifies the stream itself (optional)
 
 private:
-    DummySink(UsageEnvironment &env, MediaSubsession &subsession, char const *streamId);
     // called only by "createNew()"
+    DummySink(UsageEnvironment &environment, MediaSubsession &subsession, char const *stream_id);
+
     virtual ~DummySink();
 
-    static void afterGettingFrame(void *clientData, unsigned frameSize, unsigned numTruncatedBytes,
-                                  struct timeval presentationTime, unsigned durationInMicroseconds);
-    void afterGettingFrame(unsigned frameSize, unsigned numTruncatedBytes,
-                           struct timeval presentationTime, unsigned durationInMicroseconds);
+    static void after_getting_frame(void *data, unsigned size, unsigned truncated_size,
+                                    struct timeval presentation_time,
+                                    unsigned duration_microseconds);
+    void after_getting_frame(unsigned size, unsigned truncated_size,
+                             struct timeval presentation_time);
 
 private:
-    // redefined virtual functions:
-    virtual Boolean continuePlaying();
+    virtual Boolean continuePlaying();  // redefined virtual functions
 
 private:
-    u_int8_t *fReceiveBuffer;
-    MediaSubsession &fSubsession;
-    char *fStreamId;
+    u_int8_t *receive_buffer;
+    MediaSubsession &subsession;
+    char *stream_id;
 };
 
 StreamClientState::StreamClientState()
-    : iter(nullptr),
+    : iterator(nullptr),
       session(nullptr),
       subsession(nullptr),
-      streamTimerTask(nullptr),
+      stream_timer_task(nullptr),
       duration(0.0) {}
 
 StreamClientState::~StreamClientState() {
-    delete iter;
+    delete iterator;
     if (session != nullptr) {
         // We also need to delete "session", and unschedule "streamTimerTask" (if set)
         UsageEnvironment &env = session->envir();  // alias
 
-        env.taskScheduler().unscheduleDelayedTask(streamTimerTask);
+        env.taskScheduler().unscheduleDelayedTask(stream_timer_task);
         Medium::close(session);
     }
 }
 
 // Implementation of "ourRTSPClient":
 
-ourRTSPClient *ourRTSPClient::createNew(UsageEnvironment &env, char const *rtspURL,
-                                        int verbosityLevel, char const *applicationName,
-                                        portNumBits tunnelOverHTTPPortNum) {
-    return new ourRTSPClient(env, rtspURL, verbosityLevel, applicationName, tunnelOverHTTPPortNum);
+ourRTSPClient *ourRTSPClient::create_new(UsageEnvironment &environment, char const *url,
+                                         int verbosity_level, char const *application_name,
+                                         portNumBits tunnel_over_http_port_num) {
+    return new ourRTSPClient(environment, url, verbosity_level, application_name,
+                             tunnel_over_http_port_num);
 }
 
-ourRTSPClient::ourRTSPClient(UsageEnvironment &env, char const *rtspURL, int verbosityLevel,
-                             char const *applicationName, portNumBits tunnelOverHTTPPortNum)
-    : RTSPClient(env, rtspURL, verbosityLevel, applicationName, tunnelOverHTTPPortNum, -1) {}
-
-ourRTSPClient::~ourRTSPClient() {}
+ourRTSPClient::ourRTSPClient(UsageEnvironment &environment, char const *url, int verbosity_level,
+                             char const *application_name, portNumBits tunnel_over_http_port_num)
+    : RTSPClient(environment, url, verbosity_level, application_name, tunnel_over_http_port_num,
+                 DEFAULT_SOCKET_NUMBER_TO_SERVER) {}
 
 // Implementation of "DummySink":
 
@@ -117,20 +123,20 @@ ourRTSPClient::~ourRTSPClient() {}
 // it. Define the size of the buffer that we'll use:
 #define DUMMY_SINK_RECEIVE_BUFFER_SIZE 100000
 
-DummySink *DummySink::createNew(UsageEnvironment &env, MediaSubsession &subsession,
-                                char const *streamId) {
-    return new DummySink(env, subsession, streamId);
+DummySink *DummySink::create_new(UsageEnvironment &environment, MediaSubsession &ss,
+                                 char const *id) {
+    return new DummySink(environment, ss, id);
 }
 
-DummySink::DummySink(UsageEnvironment &env, MediaSubsession &subsession, char const *streamId)
-    : MediaSink(env), fSubsession(subsession) {
-    fStreamId = strDup(streamId);
-    fReceiveBuffer = new u_int8_t[DUMMY_SINK_RECEIVE_BUFFER_SIZE];
+DummySink::DummySink(UsageEnvironment &environment, MediaSubsession &ss, char const *id)
+    : MediaSink(environment), subsession(ss) {
+    stream_id = strDup(id);
+    receive_buffer = new u_int8_t[DUMMY_SINK_RECEIVE_BUFFER_SIZE];
 }
 
 DummySink::~DummySink() {
-    delete[] fReceiveBuffer;
-    delete[] fStreamId;
+    delete[] receive_buffer;
+    delete[] stream_id;
 }
 
 Boolean DummySink::continuePlaying() {
@@ -138,34 +144,33 @@ Boolean DummySink::continuePlaying() {
 
     // Request the next frame of data from our input source.  "afterGettingFrame()" will get called
     // later, when it arrives:
-    fSource->getNextFrame(fReceiveBuffer, DUMMY_SINK_RECEIVE_BUFFER_SIZE, afterGettingFrame, this,
+    fSource->getNextFrame(receive_buffer, DUMMY_SINK_RECEIVE_BUFFER_SIZE, after_getting_frame, this,
                           onSourceClosure, this);
     return True;
 }
 
-void DummySink::afterGettingFrame(void *clientData, unsigned frameSize, unsigned numTruncatedBytes,
-                                  struct timeval presentationTime,
-                                  unsigned durationInMicroseconds) {
-    DummySink *sink = reinterpret_cast<DummySink *>(clientData);
-    ipcamera_obj->get_frame(sink->fReceiveBuffer, frameSize);
-    sink->afterGettingFrame(frameSize, numTruncatedBytes, presentationTime, durationInMicroseconds);
+void DummySink::after_getting_frame(void *data, unsigned size, unsigned truncated_size,
+                                    struct timeval presentation_time,
+                                    unsigned duration_microseconds) {
+    DummySink *ds = reinterpret_cast<DummySink *>(data);
+    ipcamera_obj->get_frame(ds->receive_buffer, size);
+    ds->after_getting_frame(size, truncated_size, presentation_time);
 }
 
-void DummySink::afterGettingFrame(unsigned frameSize, unsigned numTruncatedBytes,
-                                  struct timeval presentationTime,
-                                  unsigned /*durationInMicroseconds*/) {
+void DummySink::after_getting_frame(unsigned size, unsigned truncated_size,
+                                    struct timeval presentation_time) {
     // We've just received a frame of data.  (Optionally) print out information about it:
     if (DEBUG_PRINT_EACH_RECEIVED_FRAME) {
-        if (fStreamId != nullptr) envir() << "Stream \"" << fStreamId << "\"; ";
-        envir() << fSubsession.mediumName() << "/" << fSubsession.codecName() << ":\tReceived "
-                << frameSize << " bytes";
-        if (numTruncatedBytes > 0) envir() << " (with " << numTruncatedBytes << " bytes truncated)";
+        if (stream_id != nullptr) envir() << "Stream \"" << stream_id << "\"; ";
+        envir() << subsession.mediumName() << "/" << subsession.codecName() << ":\tReceived "
+                << size << " bytes";
+        if (truncated_size > 0) envir() << " (with " << truncated_size << " bytes truncated)";
         char uSecsStr[6 + 1];  // used to output the 'microseconds' part of the presentation time
-        sprintf(uSecsStr, "%06u", static_cast<unsigned>(presentationTime.tv_usec));
-        envir() << ".\tPresentation time: " << static_cast<int>(presentationTime.tv_sec) << "."
+        sprintf(uSecsStr, "%06u", static_cast<unsigned>(presentation_time.tv_usec));
+        envir() << ".\tPresentation time: " << static_cast<int>(presentation_time.tv_sec) << "."
                 << uSecsStr;
-        if (fSubsession.rtpSource() != nullptr &&
-            !fSubsession.rtpSource()->hasBeenSynchronizedUsingRTCP()) {
+        if (subsession.rtpSource() != nullptr &&
+            !subsession.rtpSource()->hasBeenSynchronizedUsingRTCP()) {
             envir() << "!";  // mark the debugging output to indicate that this presentation time is
                              // not RTCP-synchronized
         }
@@ -179,55 +184,50 @@ void DummySink::afterGettingFrame(unsigned frameSize, unsigned numTruncatedBytes
     continuePlaying();
 }
 
-UsageEnvironment &operator<<(UsageEnvironment &env, const RTSPClient &rtspClient);
-UsageEnvironment &operator<<(UsageEnvironment &env, const MediaSubsession &subsession);
+UsageEnvironment &operator<<(UsageEnvironment &environment, const RTSPClient &client);
+UsageEnvironment &operator<<(UsageEnvironment &environment, const MediaSubsession &subsession);
 
 // A function that outputs a string that identifies each stream (for debugging output).  Modify this
 // if you wish:
-UsageEnvironment &operator<<(UsageEnvironment &env, const RTSPClient &rtspClient) {
-    return env << "[URL:\"" << rtspClient.url() << "\"]: ";
+UsageEnvironment &operator<<(UsageEnvironment &environment, const RTSPClient &client) {
+    return environment << "[URL:\"" << client.url() << "\"]: ";
 }
 
 // A function that outputs a string that identifies each subsession (for debugging output).  Modify
 // this if you wish:
-UsageEnvironment &operator<<(UsageEnvironment &env, const MediaSubsession &subsession) {
-    return env << subsession.mediumName() << "/" << subsession.codecName();
+UsageEnvironment &operator<<(UsageEnvironment &environment, const MediaSubsession &subsession) {
+    return environment << subsession.mediumName() << "/" << subsession.codecName();
 }
-
-// TODO review code above
 
 IPCamera::IPCamera(std::shared_ptr<Server> svr, boost::asio::io_service &controller_service,
-                   boost::asio::io_service &io_service, std::string ru)
-    : server(svr), controller_service(controller_service), io_service(io_service), rtsp_url(ru) {
+                   boost::asio::io_service &io_service, std::string url)
+    : server(svr), controller_service(controller_service), io_service(io_service), rtsp_url(url) {
     ipcamera_obj = std::shared_ptr<IPCamera>(this);
     scheduler = BasicTaskScheduler::createNew();
-    env = BasicUsageEnvironment::createNew(*scheduler);
-    openURL(*env, "camsrv", rtsp_url.c_str());  // TODO make camsrv a const
+    environment = BasicUsageEnvironment::createNew(*scheduler);
+    open_url(*environment, "camsrv", rtsp_url.c_str());  // TODO make camsrv a const
 
-    env->taskScheduler().doEventLoop(&eventLoopWatchVariable);
+    environment->taskScheduler().doEventLoop(&event_loop_watch_variable);
 }
 
-IPCamera::~IPCamera() {}
-
-void IPCamera::openURL(UsageEnvironment &m_env, char const *progName, char const *rtspURL) {
+void IPCamera::open_url(UsageEnvironment &env, char const *name, char const *url) {
     // Begin by creating a "RTSPClient" object.  Note that there is a separate "RTSPClient" object
     // for each stream that we wish to receive (even if more than stream uses the same "rtsp://"
     // URL).
-    RTSPClient *rtspClient =
-        ourRTSPClient::createNew(m_env, rtspURL, RTSP_CLIENT_VERBOSITY_LEVEL, progName);
-    if (rtspClient == nullptr) {
-        m_env << "Failed to create a RTSP client for URL \"" << rtspURL
-              << "\": " << m_env.getResultMsg() << "\n";
+    RTSPClient *client = ourRTSPClient::createNew(env, url, RTSP_CLIENT_VERBOSITY_LEVEL, name);
+    if (client == nullptr) {
+        env << "Failed to create a RTSP client for URL \"" << url << "\": " << env.getResultMsg()
+            << "\n";
         return;
     }
 
-    ++rtspClientCount;
+    ++rtsp_client_count;
 
     // Next, send a RTSP "DESCRIBE" command, to get a SDP description for the stream.
     // Note that this command - like all RTSP commands - is sent asynchronously; we do not block,
     // waiting for a response. Instead, the following function call returns immediately, and we
     // handle the RTSP response later, from within the event loop:
-    rtspClient->sendDescribeCommand(continueAfterDESCRIBE);
+    client->sendDescribeCommand(continue_after_describe);
 }
 
 void IPCamera::get_frame(void *data, unsigned size) {
@@ -238,57 +238,57 @@ void IPCamera::get_frame(void *data, unsigned size) {
     controller_service.post(std::bind(&Server::send_frame, ipcamera_obj->server, sf));
 }
 
-void IPCamera::continueAfterDESCRIBE(RTSPClient *rtspClient, int resultCode, char *resultString) {
+void IPCamera::continue_after_describe(RTSPClient *client, int result, char *result_string) {
     do {
-        UsageEnvironment &env = rtspClient->envir();                                    // alias
-        StreamClientState &scs = (reinterpret_cast<ourRTSPClient *>(rtspClient))->scs;  // alias
+        UsageEnvironment &env = client->envir();  // alias
+        StreamClientState &scs =
+            (reinterpret_cast<ourRTSPClient *>(client))->stream_client_state;  // alias
 
-        if (resultCode != 0) {
-            env << *rtspClient << "Failed to get a SDP description: " << resultString << "\n";
-            delete[] resultString;
+        if (result != 0) {
+            env << *client << "Failed to get a SDP description: " << result_string << "\n";
+            delete[] result_string;
             break;
         }
 
-        char *const sdpDescription = resultString;
-        env << *rtspClient << "Got a SDP description:\n" << sdpDescription << "\n";
+        char *const sdp_desc = result_string;
+        env << *client << "Got a SDP description:\n" << sdp_desc << "\n";
 
         // Create a media session object from this SDP description:
-        scs.session = MediaSession::createNew(env, sdpDescription);
-        delete[] sdpDescription;  // because we don't need it anymore
+        scs.session = MediaSession::createNew(env, sdp_desc);
+        delete[] sdp_desc;  // because we don't need it anymore
         if (scs.session == nullptr) {
-            env << *rtspClient
-                << "Failed to create a MediaSession object from the SDP description: "
+            env << *client << "Failed to create a MediaSession object from the SDP description: "
                 << env.getResultMsg() << "\n";
             break;
         } else if (!scs.session->hasSubsessions()) {
-            env << *rtspClient << "This session has no media subsessions (i.e., no \"m=\" lines)\n";
+            env << *client << "This session has no media subsessions (i.e., no \"m=\" lines)\n";
             break;
         }
 
         // Then, create and set up our data source objects for the session.  We do this by iterating
         // over the session's 'subsessions', calling "MediaSubsession::initiate()", and then sending
         // a RTSP "SETUP" command, on each one. (Each 'subsession' will have its own data source.)
-        scs.iter = new MediaSubsessionIterator(*scs.session);
-        setupNextSubsession(rtspClient);
+        scs.iterator = new MediaSubsessionIterator(*scs.session);
+        setup_next_subsession(client);
         return;
     } while (0);
 
-    // An unrecoverable error occurred with this stream.
-    shutdownStream(rtspClient);
+    shutdown_stream(client);  // An unrecoverable error occurred with this stream.
 }
 
-void IPCamera::setupNextSubsession(RTSPClient *rtspClient) {
-    UsageEnvironment &env = rtspClient->envir();                                    // alias
-    StreamClientState &scs = (reinterpret_cast<ourRTSPClient *>(rtspClient))->scs;  // alias
+void IPCamera::setup_next_subsession(RTSPClient *client) {
+    UsageEnvironment &env = client->envir();  // alias
+    StreamClientState &scs =
+        (reinterpret_cast<ourRTSPClient *>(client))->stream_client_state;  // alias
 
-    scs.subsession = scs.iter->next();
+    scs.subsession = scs.iterator->next();
     if (scs.subsession != nullptr) {
         if (!scs.subsession->initiate()) {
-            env << *rtspClient << "Failed to initiate the \"" << *scs.subsession
+            env << *client << "Failed to initiate the \"" << *scs.subsession
                 << "\" subsession: " << env.getResultMsg() << "\n";
-            setupNextSubsession(rtspClient);  // give up on this subsession; go to the next one
+            setup_next_subsession(client);  // give up on this subsession; go to the next one
         } else {
-            env << *rtspClient << "Initiated the \"" << *scs.subsession << "\" subsession (";
+            env << *client << "Initiated the \"" << *scs.subsession << "\" subsession (";
             if (scs.subsession->rtcpIsMuxed()) {
                 env << "client port " << static_cast<int>(scs.subsession->clientPortNum());
             } else {
@@ -298,8 +298,8 @@ void IPCamera::setupNextSubsession(RTSPClient *rtspClient) {
             env << ")\n";
 
             // Continue setting up this subsession, by sending a RTSP "SETUP" command
-            rtspClient->sendSetupCommand(*scs.subsession, continueAfterSETUP, False,
-                                         REQUEST_STREAMING_OVER_TCP);
+            client->sendSetupCommand(*scs.subsession, continue_after_setup, False,
+                                     REQUEST_STREAMING_OVER_TCP);
         }
         return;
     }
@@ -309,71 +309,67 @@ void IPCamera::setupNextSubsession(RTSPClient *rtspClient) {
     if (scs.session->absStartTime() != nullptr) {
         // Special case: The stream is indexed by 'absolute' time, so send an appropriate "PLAY"
         // command:
-        rtspClient->sendPlayCommand(*scs.session, continueAfterPLAY, scs.session->absStartTime(),
-                                    scs.session->absEndTime());
+        client->sendPlayCommand(*scs.session, continue_after_play, scs.session->absStartTime(),
+                                scs.session->absEndTime());
     } else {
         scs.duration = scs.session->playEndTime() - scs.session->playStartTime();
-        rtspClient->sendPlayCommand(*scs.session, continueAfterPLAY);
+        client->sendPlayCommand(*scs.session, continue_after_play);
     }
 }
 
-void IPCamera::shutdownStream(RTSPClient *rtspClient, int exitCode) {
-    UsageEnvironment &env = rtspClient->envir();                                    // alias
-    StreamClientState &scs = (reinterpret_cast<ourRTSPClient *>(rtspClient))->scs;  // alias
+void IPCamera::shutdown_stream(RTSPClient *client, int exit_code) {
+    UsageEnvironment &env = client->envir();  // alias
+    StreamClientState &scs =
+        (reinterpret_cast<ourRTSPClient *>(client))->stream_client_state;  // alias
 
     // First, check whether any subsessions have still to be closed:
     if (scs.session != nullptr) {
-        Boolean someSubsessionsWereActive = False;
-        MediaSubsessionIterator iter(*scs.session);
-        MediaSubsession *subsession;
+        Boolean some_subsessions_were_active = False;
+        MediaSubsessionIterator it(*scs.session);
+        MediaSubsession *ms;
 
-        while ((subsession = iter.next()) != nullptr) {
-            if (subsession->sink != nullptr) {
-                Medium::close(subsession->sink);
-                subsession->sink = nullptr;
+        while ((ms = it.next()) != nullptr) {
+            if (ms->sink != nullptr) {
+                Medium::close(ms->sink);
+                ms->sink = nullptr;
 
-                if (subsession->rtcpInstance() != nullptr) {
-                    subsession->rtcpInstance()->setByeHandler(
-                        nullptr, nullptr);  // in case the server sends a RTCP "BYE" while handling
-                                            // "TEARDOWN"
-                }
+                // in case the server sends a RTCP "BYE" while handling "TEARDOWN"
+                if (ms->rtcpInstance() != nullptr)
+                    ms->rtcpInstance()->setByeHandler(nullptr, nullptr);
 
-                someSubsessionsWereActive = True;
+                some_subsessions_were_active = True;
             }
         }
 
-        if (someSubsessionsWereActive) {
-            // Send a RTSP "TEARDOWN" command, to tell the server to shutdown the stream.
-            // Don't bother handling the response to the "TEARDOWN".
-            rtspClient->sendTeardownCommand(*scs.session, nullptr);
-        }
+        // Send a RTSP "TEARDOWN" command, to tell the server to shutdown the stream.
+        // Don't bother handling the response to the "TEARDOWN".
+        if (some_subsessions_were_active) client->sendTeardownCommand(*scs.session, nullptr);
     }
 
-    env << *rtspClient << "Closing the stream.\n";
-    Medium::close(rtspClient);
+    env << *client << "Closing the stream.\n";
+    Medium::close(client);
     // Note that this will also cause this stream's "StreamClientState" structure to get reclaimed.
 
-    if (--rtspClientCount == 0) {
-        // The final stream has ended, so exit the application now.
-        // (Of course, if you're embedding this code into your own application, you might want to
-        // comment this out, and replace it with "eventLoopWatchVariable = 1;", so that we leave the
-        // LIVE555 event loop, and continue running "main()".)
-        exit(exitCode);
-    }
+    // The final stream has ended, so exit the application now.
+    // (Of course, if you're embedding this code into your own application, you might want to
+    // comment this out, and replace it with "eventLoopWatchVariable = 1;", so that we leave the
+    // LIVE555 event loop, and continue running "main()".)
+    if (--rtsp_client_count == 0) exit(exit_code);
 }
 
-void IPCamera::continueAfterSETUP(RTSPClient *rtspClient, int resultCode, char *resultString) {
+void IPCamera::continue_after_setup(RTSPClient *client, int result, char *result_string) {
     do {
-        UsageEnvironment &env = rtspClient->envir();                                    // alias
-        StreamClientState &scs = (reinterpret_cast<ourRTSPClient *>(rtspClient))->scs;  // alias
+        UsageEnvironment &env = client->envir();  // alias
+        StreamClientState &scs =
+            (reinterpret_cast<ourRTSPClient *>(client))->stream_client_state;  // alias
 
-        if (resultCode != 0) {
-            env << *rtspClient << "Failed to set up the \"" << *scs.subsession
-                << "\" subsession: " << resultString << "\n";
+        if (result != 0) {
+            env << *client << "Failed to set up the \"" << *scs.subsession
+                << "\" subsession: " << result_string << "\n";
             break;
         }
 
-        env << *rtspClient << "Set up the \"" << *scs.subsession << "\" subsession (";
+        env << *client << "Set up the \"" << *scs.subsession << "\" subsession (";
         if (scs.subsession->rtcpIsMuxed()) {
             env << "client port " << static_cast<int>(scs.subsession->clientPortNum());
         } else {
@@ -386,42 +382,39 @@ void IPCamera::continueAfterSETUP(RTSPClient *rtspClient, int resultCode, char *
         // "startPlaying()" on it. (This will prepare the data sink to receive data; the actual flow
         // of data from the client won't start happening until later, after we've sent a RTSP "PLAY"
         // command.)
-
-        scs.subsession->sink = DummySink::createNew(env, *scs.subsession, rtspClient->url());
-        // perhaps use your own custom "MediaSink" subclass instead
+        scs.subsession->sink = DummySink::create_new(env, *scs.subsession, client->url());
         if (scs.subsession->sink == nullptr) {
-            env << *rtspClient << "Failed to create a data sink for the \"" << *scs.subsession
+            env << *client << "Failed to create a data sink for the \"" << *scs.subsession
                 << "\" subsession: " << env.getResultMsg() << "\n";
             break;
         }
 
-        env << *rtspClient << "Created a data sink for the \"" << *scs.subsession
-            << "\" subsession\n";
-        scs.subsession->miscPtr = rtspClient;  // a hack to let subsession handler functions get the
-                                               // "RTSPClient" from the subsession
-        scs.subsession->sink->startPlaying(*(scs.subsession->readSource()), subsessionAfterPlaying,
-                                           scs.subsession);
+        env << *client << "Created a data sink for the \"" << *scs.subsession << "\" subsession\n";
+        scs.subsession->miscPtr = client;  // a hack to let subsession handler functions get the
+                                           // "RTSPClient" from the subsession
+        scs.subsession->sink->startPlaying(*(scs.subsession->readSource()),
+                                           subsession_after_playing, scs.subsession);
         // Also set a handler to be called if a RTCP "BYE" arrives for this subsession:
         if (scs.subsession->rtcpInstance() != nullptr) {
-            scs.subsession->rtcpInstance()->setByeWithReasonHandler(subsessionByeHandler,
+            scs.subsession->rtcpInstance()->setByeWithReasonHandler(subsession_bye_handler,
                                                                     scs.subsession);
         }
     } while (0);
-    delete[] resultString;
+    delete[] result_string;
 
-    // Set up the next subsession, if any:
-    setupNextSubsession(rtspClient);
+    setup_next_subsession(client);  // Set up the next subsession, if any
 }
 
-void IPCamera::continueAfterPLAY(RTSPClient *rtspClient, int resultCode, char *resultString) {
-    Boolean success = False;
+void IPCamera::continue_after_play(RTSPClient *client, int result, char *result_string) {
+    Boolean res = False;
 
     do {
-        UsageEnvironment &env = rtspClient->envir();                                    // alias
-        StreamClientState &scs = (reinterpret_cast<ourRTSPClient *>(rtspClient))->scs;  // alias
+        UsageEnvironment &env = client->envir();  // alias
+        StreamClientState &scs =
+            (reinterpret_cast<ourRTSPClient *>(client))->stream_client_state;  // alias
 
-        if (resultCode != 0) {
-            env << *rtspClient << "Failed to start playing session: " << resultString << "\n";
+        if (client != 0) {
+            env << *client << "Failed to start playing session: " << result_string << "\n";
             break;
         }
 
@@ -431,71 +424,67 @@ void IPCamera::continueAfterPLAY(RTSPClient *rtspClient, int resultCode, char *r
         // another RTSP "PLAY" - then you can omit this code. (Alternatively, if you don't want to
         // receive the entire stream, you could set this timer for some shorter value.)
         if (scs.duration > 0) {
-            unsigned const delaySlop = 2;  // number of seconds extra to delay, after the stream's
-                                           // expected duration.  (This is optional.)
-            scs.duration += delaySlop;
-            unsigned uSecsToDelay = static_cast<unsigned>((scs.duration * 1000000));
-            scs.streamTimerTask = env.taskScheduler().scheduleDelayedTask(
-                uSecsToDelay, reinterpret_cast<TaskFunc *>(streamTimerHandler), rtspClient);
+            // number of seconds extra to delay, after the stream's
+            // expected duration.  (This is optional.)
+            unsigned const _secs_after_delay = 2;
+            scs.duration += _secs_after_delay;
+
+            unsigned _usecs_to_delay = static_cast<unsigned>((scs.duration * 1000000));
+            scs.stream_timer_task = env.taskScheduler().scheduleDelayedTask(
+                _usecs_to_delay, reinterpret_cast<TaskFunc *>(stream_timer_handler), client);
         }
 
-        env << *rtspClient << "Started playing session";
-        if (scs.duration > 0) {
-            env << " (for up to " << scs.duration << " seconds)";
-        }
+        env << *client << "Started playing session";
+        if (scs.duration > 0) env << " (for up to " << scs.duration << " seconds)";
         env << "...\n";
 
-        success = True;
+        res = True;
     } while (0);
-    delete[] resultString;
+    delete[] result_string;
 
-    if (!success) {
-        // An unrecoverable error occurred with this stream.
-        shutdownStream(rtspClient);
-    }
+    // An unrecoverable error occurred with this stream.
+    if (!res) shutdown_stream(client);
 }
 
-void IPCamera::subsessionAfterPlaying(void *clientData) {
-    MediaSubsession *subsession = reinterpret_cast<MediaSubsession *>(clientData);
-    RTSPClient *rtspClient = reinterpret_cast<RTSPClient *>(subsession->miscPtr);
+void IPCamera::subsession_after_playing(void *data) {
+    MediaSubsession *ms = reinterpret_cast<MediaSubsession *>(data);
+    RTSPClient *cl = reinterpret_cast<RTSPClient *>(ms->miscPtr);
 
     // Begin by closing this subsession's stream:
-    Medium::close(subsession->sink);
-    subsession->sink = nullptr;
+    Medium::close(ms->sink);
+    ms->sink = nullptr;
 
     // Next, check whether *all* subsessions' streams have now been closed:
-    MediaSession &session = subsession->parentSession();
-    MediaSubsessionIterator iter(session);
-    while ((subsession = iter.next()) != nullptr) {
-        if (subsession->sink != nullptr) return;  // this subsession is still active
+    MediaSession &sesh = ms->parentSession();
+    MediaSubsessionIterator it(sesh);
+    while ((ms = it.next()) != nullptr) {
+        if (ms->sink != nullptr) return;  // this subsession is still active
     }
 
     // All subsessions' streams have now been closed, so shutdown the client:
-    shutdownStream(rtspClient);
+    shutdown_stream(cl);
 }
 
-void IPCamera::subsessionByeHandler(void *clientData, char const *reason) {
-    MediaSubsession *subsession = reinterpret_cast<MediaSubsession *>(clientData);
-    RTSPClient *rtspClient = reinterpret_cast<RTSPClient *>(subsession->miscPtr);
-    UsageEnvironment &env = rtspClient->envir();  // alias
+void IPCamera::subsession_bye_handler(void *data, char const *reason) {
+    MediaSubsession *ms = reinterpret_cast<MediaSubsession *>(data);
+    RTSPClient *cl = reinterpret_cast<RTSPClient *>(ms->miscPtr);
+    UsageEnvironment &env = cl->envir();  // alias
 
-    env << *rtspClient << "Received RTCP \"BYE\"";
+    env << *cl << "Received RTCP \"BYE\"";
     if (reason != nullptr) {
         env << " (reason:\"" << reason << "\")";
         delete[] reason;
     }
-    env << " on \"" << *subsession << "\" subsession\n";
+    env << " on \"" << *ms << "\" subsession\n";
 
-    // Now act as if the subsession had closed:
-    subsessionAfterPlaying(subsession);
+    subsession_after_playing(ms);  // Now act as if the subsession had closed
 }
 
-void IPCamera::streamTimerHandler(void *clientData) {
-    ourRTSPClient *rtspClient = reinterpret_cast<ourRTSPClient *>(clientData);
-    StreamClientState &scs = rtspClient->scs;  // alias
+void IPCamera::stream_timer_handler(void *data) {
+    ourRTSPClient *cl = reinterpret_cast<ourRTSPClient *>(data);
+    StreamClientState &scs = cl->stream_client_state;  // alias
 
-    scs.streamTimerTask = nullptr;
+    scs.stream_timer_task = nullptr;
 
-    // Shut down the stream:
-    shutdownStream(rtspClient);
+    shutdown_stream(cl);  // Shut down the stream
 }

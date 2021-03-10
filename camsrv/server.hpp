@@ -28,17 +28,11 @@ protected:
     boost::signals2::signal<void()> stream_off;
 
 private:
-    void reset();
-    void reset_buffers();
-    void start_async_accept();
-    void start_keepalive();
-    void keepalive_async_wait(const boost::system::error_code &error);
+    void reset();               // resets socket connection that server was corresponding with
+    void reset_buffers();       // resets buffer stream for received data
+    void start_async_accept();  // starts listening for new connections on socket
+    void start_keepalive();     // starts keep-alive timer
     void start_read();
-    void start_read_header(
-        const boost::system::error_code &error,
-        std::size_t bytes_transferred);  // TODO the server doesn't actuall have a header (rename)
-    void handle_accept(const boost::system::error_code
-                           &error);  // TODO probably could make this lambda vs global function
 
     // NOTE: using a temporary socket because we want to keep accepting tcp connections
     // This is only a one connection allowed server, but due to using different machines
@@ -55,7 +49,7 @@ private:
     boost::asio::steady_timer timer;  // keep-alive timer
 
     boost::asio::streambuf message_buffer;
-    const std::uint16_t _port;  // TODO fix naming convention
+    const std::uint16_t port;
 };
 
 #endif

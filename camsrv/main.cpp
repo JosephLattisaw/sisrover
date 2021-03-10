@@ -3,15 +3,12 @@
 #include <iostream>
 
 #include "controller.hpp"
+#include "defines.hpp"
 
 #define MIN_PORT 2000
 #define MAX_PORT 65536
 
 namespace {
-const std::string CAMSRV_VERSION_NUMBER = "camsrv 4.0.0";  // version number
-const std::string CAMSRV_APPLICATION_DESCRIPTION =
-    "camera server which feeds webcam images from remote cpu";  // application description
-
 const std::string OPTIONS_DESCRIPTION = "Options";  // options label for help menu
 const int OPTION_HANDLES_COMBO = 2;
 
@@ -44,23 +41,7 @@ enum OPTION_HANDLES {
 };
 
 // utility function to print version number
-void print_version_number() { std::cout << CAMSRV_VERSION_NUMBER << std::endl; }
-
-// TODO consolidate both of these functions into one function
-// utility function to get a specific options handle
-std::string get_option_handles(OPTIONS index) {
-    std::string res;
-
-    try {
-        auto opt_h = OPTIONS_HANDLE.at(index);
-        res = opt_h.at(OPTION_HANDLES::HANDLE) + "," + opt_h.at(OPTION_HANDLES::SHORT_HANDLE);
-    } catch (std::out_of_range const &exc) {
-        std::cout << __PRETTY_FUNCTION__ << ", index: " << index << std::endl;
-        throw;
-    }
-
-    return res;
-}
+void print_version_number() { std::cout << camsrv::CAMSRV_VERSION_NUMBER << std::endl; }
 
 // utility function to get a specific options handle based on options table
 std::string get_option_handle(OPTIONS options_index, OPTION_HANDLES handle_index) {
@@ -77,7 +58,12 @@ std::string get_option_handle(OPTIONS options_index, OPTION_HANDLES handle_index
     return res;
 }
 
-// TODO consolidate both of the below functions into one
+// utility function to get a specific options handle
+std::string get_option_handles(OPTIONS index) {
+    return get_option_handle(index, OPTION_HANDLES::HANDLE) + "," +
+           get_option_handle(index, OPTION_HANDLES::SHORT_HANDLE);
+}
+
 // utility function to get the options description
 std::string get_options_description(OPTIONS index) {
     return get_option_handle(index, OPTION_HANDLES::DESCRIPTION);
@@ -96,25 +82,28 @@ int main(int argc, char **argv) {
     std::string url;                               // url to be used for our ip camera
 
     // Getting our options values. NOTE: created a separate object only for readability
-    auto hlp_hdl = get_option_handles(OPTIONS::HELP).c_str();
-    auto hlp_desc = get_options_description(OPTIONS::HELP).c_str();
-    auto opt_hdl = get_option_handles(OPTIONS::VERSION).c_str();
-    auto opt_desc = get_options_description(OPTIONS::VERSION).c_str();
-    auto dev_hdl = get_option_handles(OPTIONS::DEVICE_NAME).c_str();
+    auto hlp_hdl = get_option_handles(OPTIONS::HELP);
+    auto hlp_desc = get_options_description(OPTIONS::HELP);
+    auto opt_hdl = get_option_handles(OPTIONS::VERSION);
+    auto opt_desc = get_options_description(OPTIONS::VERSION);
+    auto dev_hdl = get_option_handles(OPTIONS::DEVICE_NAME);
     auto dev_opt = prog_opts::value<decltype(device_name)>(&device_name);
-    auto dev_desc = get_options_description(OPTIONS::DEVICE_NAME).c_str();
-    auto port_hdl = get_option_handles(OPTIONS::PORT).c_str();
+    auto dev_desc = get_options_description(OPTIONS::DEVICE_NAME);
+    auto port_hdl = get_option_handles(OPTIONS::PORT);
     auto port_opt = prog_opts::value<decltype(port_number)>(&port_number);
-    auto port_desc = get_options_description(OPTIONS::PORT).c_str();
-    auto url_hdl = get_option_handles(OPTIONS::URL).c_str();
+    auto port_desc = get_options_description(OPTIONS::PORT);
+    auto url_hdl = get_option_handles(OPTIONS::URL);
     auto url_opt = prog_opts::value<decltype(url)>(&url);
-    auto url_desc = get_options_description(OPTIONS::URL).c_str();
+    auto url_desc = get_options_description(OPTIONS::URL);
 
     // creating our options table
     prog_opts::options_description desc(OPTIONS_DESCRIPTION);
-    desc.add_options()(hlp_hdl, hlp_desc)(
-        opt_hdl, opt_desc)(dev_hdl, dev_opt, dev_desc)(port_hdl, port_opt,
-                                                       port_desc)(url_hdl, url_opt, url_desc);
+    desc.add_options()(hlp_hdl.c_str(), hlp_desc.c_str())(
+        opt_hdl.c_str(), opt_desc.c_str())(dev_hdl.c_str(), dev_opt,
+                                           dev_desc.c_str())(port_hdl.c_str(), port_opt,
+                                                             port_desc.c_str())(url_hdl.c_str(),
+                                                                                url_opt,
+                                                                                url_desc.c_str());
 
     // grabbing options from command line
     prog_opts::variables_map vars_map;
@@ -124,7 +113,7 @@ int main(int argc, char **argv) {
     // if user selected help option
     if (vars_map.count(get_options_long_handle(OPTIONS::HELP))) {
         print_version_number();
-        std::cout << CAMSRV_APPLICATION_DESCRIPTION << std::endl;
+        std::cout << camsrv::CAMSRV_APPLICATION_DESCRIPTION << std::endl;
         std::cout << desc << std::endl;
         return 0;
     }
