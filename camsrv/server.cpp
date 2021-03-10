@@ -10,7 +10,7 @@ Server::Server(boost::asio::io_service& io_service, std::uint16_t port)
     : io_service(io_service),
       acceptor(io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port)),
       _port(port),
-      timer(io_service, std::chrono::seconds(KEEP_ALIVE_TIMOUT_SECONDS)) {
+      timer(io_service) {
     start_async_accept();  // starting to accept connections
 }
 
@@ -128,5 +128,7 @@ void Server::send_frame(std::vector<std::uint8_t> image) {
         cm.command = camsrv::camsrv_message::camsrv_command::IMAGE;
         cm.size = static_cast<decltype(cm.size)>(image.size());
         boost::asio::write(*socket, boost::asio::buffer(image.data(), image.size()));
-    }
+    } else
+        std::cerr << "server: couldn't send frame of " << image.size()
+                  << " bytes, not connected to server" << std::endl;
 }

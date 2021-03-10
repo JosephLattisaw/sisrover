@@ -1,15 +1,21 @@
 #ifndef server__HPP
 #define server__HPP
 
+// boost includes
 #include <boost/asio.hpp>
 
+// needed to avoid pragma message warning
+// warning is completely contained within boost's includes
 #ifndef BOOST_ALLOW_DEPRECATED_HEADERS
 #define BOOST_ALLOW_DEPRECATED_HEADERS
 #include <boost/signals2.hpp>
 #undef BOOST_ALLOW_DEPRECATED_HEADERS
 #else
+// just in case someone wants to define the macro
 #include <boost/signals2.hpp>
 #endif
+
+#include <iostream>
 
 class Server {
 public:
