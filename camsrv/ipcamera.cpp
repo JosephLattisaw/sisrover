@@ -1,5 +1,6 @@
 #include "ipcamera.hpp"
 
+#include "defines.hpp"
 #include "server.hpp"
 
 // By default, we request that the server stream its data using RTP/UDP.
@@ -201,11 +202,12 @@ UsageEnvironment &operator<<(UsageEnvironment &environment, const MediaSubsessio
 
 IPCamera::IPCamera(std::shared_ptr<Server> svr, boost::asio::io_service &controller_service,
                    boost::asio::io_service &io_service, std::string url)
-    : server(svr), controller_service(controller_service), io_service(io_service), rtsp_url(url) {
+    : Camera(svr, controller_service, io_service, url) {
     ipcamera_obj = std::shared_ptr<IPCamera>(this);
     scheduler = BasicTaskScheduler::createNew();
     environment = BasicUsageEnvironment::createNew(*scheduler);
-    open_url(*environment, "camsrv", rtsp_url.c_str());  // TODO make camsrv a const
+    open_url(*environment, camsrv::CAMSRV_APPLICATION_NAME.c_str(),
+             Camera::get_device_name().c_str());  // TODO make camsrv a const
 
     environment->taskScheduler().doEventLoop(&event_loop_watch_variable);
 }
@@ -235,7 +237,10 @@ void IPCamera::get_frame(void *data, unsigned size) {
     sf.resize(size);
     std::memcpy(sf.data(), data, size);
 
-    controller_service.post(std::bind(&Server::send_frame, ipcamera_obj->server, sf));
+    // no real way to turn on and off streaming on the ip camera, so we just don't send data
+    // if the stream is "off"
+    if (Camera::is_streaming())
+        Camera::controller_service.post(std::bind(&Server::send_frame, ipcamera_obj->server, sf));
 }
 
 void IPCamera::continue_after_describe(RTSPClient *client, int result, char *result_string) {

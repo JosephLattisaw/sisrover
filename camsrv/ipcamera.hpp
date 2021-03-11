@@ -5,21 +5,22 @@
 #include <iostream>
 #include <thread>
 
-// boost includes
-#include <boost/asio.hpp>
-
 // live555 includes
 #include <BasicUsageEnvironment.hh>
 #include <liveMedia.hh>
 
+#include "camera.hpp"
+
 class Server;  // forward declaration
 
-class IPCamera {
+class IPCamera : public Camera {
 public:
     IPCamera(std::shared_ptr<Server> server, boost::asio::io_service &controller_service,
              boost::asio::io_service &io_service, std::string rtsp_url);
 
-    void get_frame(void *data, unsigned size);  // TODO, this probably shouldn't be public used by dummysink
+    void get_frame(
+        void *data,
+        unsigned size);  // TODO, this probably shouldn't be public, only used by dummysink+
 
 private:
     // RTSP 'response handlers'
@@ -44,16 +45,9 @@ private:
     // Used to shut down and close a stream (including its "RTSPClient" object)
     static void shutdown_stream(RTSPClient *client, int exit_code = 1);
 
-    // services
-    boost::asio::io_service &controller_service;  // controller object threads service
-    boost::asio::io_service &io_service;          // service used by IPCamera object
-
     // live555 api
     UsageEnvironment *environment = nullptr;
     TaskScheduler *scheduler = nullptr;
-
-    std::shared_ptr<Server> server;  // reference to server to be able to send data
-    std::string rtsp_url;            // url used for opening ip camera
 };
 
 #endif

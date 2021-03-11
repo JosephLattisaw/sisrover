@@ -19,13 +19,11 @@
 
 class Server {
 public:
-    Server(boost::asio::io_service &io_service, std::uint16_t port);
+    using Stream_Callback = std::function<void(bool)>;
+    Server(boost::asio::io_service &io_service, std::uint16_t port, Stream_Callback callback);
 
+    void request_stream_status_update();
     void send_frame(std::vector<std::uint8_t> image);
-
-protected:
-    boost::signals2::signal<void()> stream_on;
-    boost::signals2::signal<void()> stream_off;
 
 private:
     void reset();               // resets socket connection that server was corresponding with
@@ -33,6 +31,8 @@ private:
     void start_async_accept();  // starts listening for new connections on socket
     void start_keepalive();     // starts keep-alive timer
     void start_read();
+
+    void update_stream_status(bool status);
 
     // NOTE: using a temporary socket because we want to keep accepting tcp connections
     // This is only a one connection allowed server, but due to using different machines
@@ -50,6 +50,11 @@ private:
 
     boost::asio::streambuf message_buffer;
     const std::uint16_t port;
+
+    Stream_Callback stream_callback;
+
+    bool server_started = false;
+    bool streaming = false;
 };
 
 #endif

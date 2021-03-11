@@ -1,31 +1,35 @@
 #ifndef webcamera__HPP
 #define webcamera__HPP
 
+// standard includes
 #include <string>
 
-class WebCamera {
+// boost includes
+#include <boost/asio.hpp>
+
+#include "camera.hpp"
+
+class Server;  // forward declaration
+
+class WebCamera : public Camera {
 public:
-    WebCamera(std::string device_name);
+    WebCamera(std::shared_ptr<Server> server, boost::asio::io_service &controller_service,
+              boost::asio::io_service &io_service, std::string device_name);
     ~WebCamera();
 
-    void stream_off();
-    void stream_on();
+    void set_stream(bool on);  // lets you turn stream on/off
 
 private:
-    // device logic
-    void close_dev();  // closes device
-    void init_dev();   // initializes device
-    void init_mmap();
-    void open_dev();    // opens device
-    void uninit_dev();  // uninitialize device
-    int xioctl(unsigned long request, void *arg);
     void read_frame();
+    void send_stream_request(unsigned long request);
+    int xioctl(unsigned long request, void *arg);  // utility helper
 
-    std::uint8_t *buf;
-    size_t buf_size;
-    std::string dev_nm;
-    int file_dscrptr;
-    bool streaming = false;
+    // buffer
+    std::uint8_t *buffer;
+    size_t buffer_size;
+
+    int file_descriptor;
+    boost::asio::steady_timer timer;
 };
 
 #endif

@@ -51,6 +51,6 @@ find_package(Boost 1.74.0 COMPONENTS program_options)
 
 add_definitions(-std=c++17)
 
-add_executable(camsrv main.cpp controller.cpp server.cpp ipcamera.cpp webcamera.cpp)
+add_executable(camsrv main.cpp controller.cpp server.cpp ipcamera.cpp webcamera.cpp camera.cpp)
 target_link_libraries(camsrv ${Boost_LIBRARIES} pthread v4l2 liveMedia groupsock UsageEnvironment BasicUsageEnvironment)
 

@@ -6,11 +6,12 @@
 
 #define KEEP_ALIVE_TIMOUT_SECONDS 15
 
-Server::Server(boost::asio::io_service& io_service, std::uint16_t p)
+Server::Server(boost::asio::io_service& io_service, std::uint16_t p, Stream_Callback sc)
     : io_service(io_service),
       acceptor(io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), p)),
       port(p),
-      timer(io_service) {
+      timer(io_service),
+      stream_callback{sc} {
     start_async_accept();  // starting to accept connections
 }
 
@@ -18,7 +19,7 @@ Server::Server(boost::asio::io_service& io_service, std::uint16_t p)
 void Server::start_async_accept() {
     assert(!temp_socket);  // sanity check
     temp_socket = std::make_unique<boost::asio::ip::tcp::socket>(io_service);
-    acceptor.async_accept(*temp_socket, [this](const boost::system::error_code& error) {
+    acceptor.async_accept(*temp_socket, [&](const boost::system::error_code& error) {
         if (!error) {
             std::cout << "server: accepted connection on port " << port << std::endl;
             reset();                          // resetting socket before setting it
@@ -41,7 +42,7 @@ void Server::start_read() {
     assert(socket);  // sanity check
     boost::asio::async_read(
         *socket, message_buffer, boost::asio::transfer_exactly(sizeof(camsrv::camsrv_message)),
-        [this](const boost::system::error_code& error, std::size_t bytes_transferred) {
+        [&](const boost::system::error_code& error, std::size_t bytes_transferred) {
             if (!error) {
                 if (message_buffer.size() == sizeof(camsrv::camsrv_message)) {
                     const camsrv::camsrv_message* cm =
@@ -51,11 +52,11 @@ void Server::start_read() {
                     switch (cm->command) {
                         case camsrv::camsrv_message::camsrv_command::STREAM_ON:
                             std::cout << "server: received stream on command" << std::endl;
-                            stream_on();
+                            update_stream_status(true);
                             break;
                         case camsrv::camsrv_message::camsrv_command::STREAM_OFF:
                             std::cout << "server: received stream off command" << std::endl;
-                            stream_off();
+                            update_stream_status(false);
                             break;
                         case camsrv::camsrv_message::camsrv_command::KEEP_ALIVE:
                             std::cout << "server: received keepalive" << std::endl;
@@ -92,7 +93,7 @@ void Server::reset() {
         socket.release();
     }
     reset_buffers();
-    stream_off();
+    update_stream_status(false);
     timer.cancel();  // cancelling keep alive timer
 }
 
@@ -102,7 +103,7 @@ void Server::reset_buffers() { message_buffer.consume(message_buffer.size()); }
 void Server::start_keepalive() {
     std::cout << "server: " << __PRETTY_FUNCTION__ << " called" << std::endl;
     timer.expires_after(std::chrono::seconds(KEEP_ALIVE_TIMOUT_SECONDS));
-    timer.async_wait([this](const boost::system::error_code& error) {
+    timer.async_wait([&](const boost::system::error_code& error) {
         if (error == boost::asio::error::operation_aborted && socket)
             start_keepalive();
         else if (!error) {
@@ -120,8 +121,16 @@ void Server::send_frame(std::vector<std::uint8_t> image) {
         std::cout << "server: sending frame of " << image.size() << " bytes" << std::endl;
         cm.command = camsrv::camsrv_message::camsrv_command::IMAGE;
         cm.size = static_cast<decltype(cm.size)>(image.size());
+        boost::asio::write(*socket, boost::asio::buffer(reinterpret_cast<char*>(&cm), sizeof(cm)));
         boost::asio::write(*socket, boost::asio::buffer(image.data(), image.size()));
     } else
         std::cerr << "server: couldn't send frame of " << image.size()
                   << " bytes, not connected to server" << std::endl;
 }
+
+void Server::update_stream_status(bool status) {
+    streaming = status;
+    stream_callback(streaming);
+}
+
+void Server::request_stream_status_update() { update_stream_status(streaming); }

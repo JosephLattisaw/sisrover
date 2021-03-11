@@ -8,11 +8,10 @@
 // boost includes
 #include <boost/asio.hpp>
 
+#include "camera.hpp"
 #include "ipcamera.hpp"
 #include "server.hpp"
 #include "webcamera.hpp"
-
-// TODO a lot of this needs to be reworked
 
 class Controller {
 public:
@@ -21,18 +20,14 @@ public:
     ~Controller();
 
 private:
-    void start_threads(
-        std::string device_name,
-        std::string url);  // TODO probably doesn't need to be a function, do lambda instead
+    void worker_thread(std::string device_name, std::string url);
 
     // asio services
     boost::asio::io_service camera_service;
     boost::asio::io_service &io_service;
 
-    // cameras
-    // TODO see if we can make a base class out of these both and only have one unique ptr :)
-    std::unique_ptr<IPCamera> ip_camera;
-    std::unique_ptr<WebCamera> web_camera;
+    // camera
+    std::unique_ptr<Camera> camera;
     std::thread camera_thread;
 
     std::shared_ptr<Server> server;
