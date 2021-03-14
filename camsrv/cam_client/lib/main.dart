@@ -1,6 +1,24 @@
 import 'package:flutter/material.dart';
+import 'dart:ffi' as ffi;
+import 'dart:io' show Platform, Directory;
+import 'package:path/path.dart' as path;
+
+// FFI signature of the hello_world C function
+typedef hello_world_func = ffi.Void Function();
+// Dart type definition for calling the C foreign function
+typedef HelloWorld = void Function();
+
 
 void main() {
+  final dylib = ffi.DynamicLibrary.open('/home/efsi/projects/dev/sisrover/repos/sisrover.git/camsrv/cam_client/hello_library/bld/libhello.so');
+ 
+  // Look up the C function 'hello_world'
+  final HelloWorld hello = dylib
+      .lookup<ffi.NativeFunction<hello_world_func>>('hello_world')
+      .asFunction();
+  // Call the function
+  hello();
+
   runApp(MyApp());
 }
 
