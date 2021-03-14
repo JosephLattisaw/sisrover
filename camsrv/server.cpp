@@ -60,10 +60,10 @@ void Server::start_read() {
                             break;
                         case camsrv::camsrv_message::camsrv_command::KEEP_ALIVE:
                             std::cout << "server: received keepalive" << std::endl;
-                            timer.cancel();  // cancelling keep alive expiration
+                            timer.cancel();  // cancelling keep alive expiration TODO client should be getting keep alive not server
                             break;
                         case camsrv::camsrv_message::camsrv_command::IMAGE:
-                        default:
+                        default: //TODO this should be cerr
                             std::cout << "server: received unknown command: "
                                       << static_cast<std::uint32_t>(cm->command) << std::endl;
                             // disconnecting socket from the server because unknown command was sent
@@ -102,7 +102,7 @@ void Server::reset_buffers() { message_buffer.consume(message_buffer.size()); }
 
 void Server::start_keepalive() {
     std::cout << "server: " << __PRETTY_FUNCTION__ << " called" << std::endl;
-    timer.expires_after(std::chrono::seconds(KEEP_ALIVE_TIMOUT_SECONDS));
+    timer.expires_after(std::chrono::seconds(KEEP_ALIVE_TIMOUT_SECONDS)); //TODO fix spelling of timeout
     timer.async_wait([&](const boost::system::error_code& error) {
         if (error == boost::asio::error::operation_aborted && socket)
             start_keepalive();
