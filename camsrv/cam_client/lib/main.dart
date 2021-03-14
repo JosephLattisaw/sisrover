@@ -8,13 +8,13 @@ typedef hello_world_func = ffi.Void Function();
 // Dart type definition for calling the C foreign function
 typedef HelloWorld = void Function();
 
-
 void main() {
-  final dylib = ffi.DynamicLibrary.open('/home/efsi/projects/dev/sisrover/repos/sisrover.git/camsrv/cam_client/hello_library/bld/libhello.so');
- 
+  final dylib = ffi.DynamicLibrary.open(
+      '/home/efsi/projects/dev/sisrover/repos/sisrover.git/camsrv/cam_client/cam_client_backend/build/libcam_client_backend.so');
+
   // Look up the C function 'hello_world'
   final HelloWorld hello = dylib
-      .lookup<ffi.NativeFunction<hello_world_func>>('hello_world')
+      .lookup<ffi.NativeFunction<hello_world_func>>('say_hello')
       .asFunction();
   // Call the function
   hello();
