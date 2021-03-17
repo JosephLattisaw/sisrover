@@ -2,8 +2,9 @@
 
 #include <iostream>
 
-Cam_Client::Cam_Client(boost::asio::io_service &io_service)
+Cam_Client::Cam_Client(boost::asio::io_service &io_service, Connection_Callback conn_cb)
     : io_service(io_service),
+      connection_callback{conn_cb},
       socket(io_service),
       endpoint(boost::asio::ip::address::from_string("127.0.0.1"), 20000),
       timer(io_service) {
@@ -19,15 +20,21 @@ void Cam_Client::start_keepalive() {
                 std::cout << "client: sending keepalive" << std::endl;
                 camsrv::camsrv_message cm;
                 cm.command = camsrv::camsrv_message::camsrv_command::KEEP_ALIVE;
-                boost::asio::write(socket,
-                                   boost::asio::buffer(reinterpret_cast<char *>(&cm), sizeof(cm)));
+
+                try {
+                    boost::asio::write(
+                        socket, boost::asio::buffer(reinterpret_cast<char *>(&cm), sizeof(cm)));
+                } catch (const boost::exception &) {
+                    std::cerr << "client: error writing keep alive, resetting socket" << std::endl;
+                    reset();  // resetting socket because of error
+                }
+
+                io_service.post(std::bind(&Cam_Client::start_keepalive, this));
             }
         } else {
             std::cerr << "client: keepalive error, resetting socket" << std::endl;
-            reset();
+            reset();  // resetting socket because of error
         }
-
-        start_keepalive();
     });
 }
 
@@ -35,14 +42,23 @@ void Cam_Client::start_async_connect() {
     socket.async_connect(endpoint, [&](const boost::system::error_code &error) {
         if (!error) {
             std::cout << "connected successfully" << std::endl;
+            updated_connection_status(true);
+
             start_read();
 
             camsrv::camsrv_message cm;
             cm.command = camsrv::camsrv_message::camsrv_command::STREAM_ON;
-            boost::asio::write(socket,
-                               boost::asio::buffer(reinterpret_cast<char *>(&cm), sizeof(cm)));
+
+            try {
+                boost::asio::write(socket,
+                                   boost::asio::buffer(reinterpret_cast<char *>(&cm), sizeof(cm)));
+            } catch (const boost::exception &) {
+                std::cerr << "client: error writing stream on, resetting socket, reason: "
+                          << std::endl;
+                reset();
+            }
         } else
-            std::cout << "connection failed" << std::endl;
+            std::cerr << "client: connection failed" << std::endl;
     });
 }
 
@@ -105,12 +121,29 @@ void Cam_Client::start_read() {
 
 void Cam_Client::reset() {
     std::cout << "client: resetting socket" << std::endl;
-    socket.close();
+
+    try {
+        socket.close();
+    } catch (const boost::exception &) {
+        std::cerr << "client: error closing socket connection" << std::endl;
+        io_service.post(std::bind(&Cam_Client::reset, this));
+    }
+
     reset_buffers();
+    updated_connection_status(false);
+
     start_async_connect();
 }
 
 void Cam_Client::reset_buffers() {
     header_buffer.consume(header_buffer.size());
     data_buffer.consume(data_buffer.size());
+}
+
+void Cam_Client::updated_connection_status(bool status) {
+    // only want to update when there is a change
+    if (status != connection_status) {
+        connection_status = status;
+        connection_callback(connection_status);
+    }
 }

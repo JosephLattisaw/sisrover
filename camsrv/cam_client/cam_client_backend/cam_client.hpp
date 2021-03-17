@@ -6,8 +6,11 @@
 #include "camsrv_msg.hpp"
 
 class Cam_Client {
+    using Connection_Callback = std::function<void(bool)>;
+    using Image_Callback = std::function<void(int)>;
+
 public:
-    Cam_Client(boost::asio::io_service &io_service);
+    Cam_Client(boost::asio::io_service &io_service, Connection_Callback conn_cb);
 
 private:
     void reset();
@@ -17,6 +20,7 @@ private:
     void start_async_connect();
 
     void start_keepalive();
+    void updated_connection_status(bool status);
 
     boost::asio::streambuf header_buffer;
     boost::asio::streambuf data_buffer;
@@ -25,6 +29,11 @@ private:
     boost::asio::io_service &io_service;
     boost::asio::ip::tcp::socket socket;
     boost::asio::steady_timer timer;
+
+    Connection_Callback connection_callback;
+    Image_Callback image_callback;
+
+    bool connection_status = false;
 };
 
 #endif
