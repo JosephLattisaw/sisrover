@@ -1,15 +1,21 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'dart:io' show Platform, Directory;
 import 'package:path/path.dart' as path;
 import 'c_api/cam_client_c_api.dart' as c_api;
 
-void main() {
+import 'dart:ffi' as ffi; //TODO remove
+import 'package:ffi/ffi.dart';
+import 'dart:isolate';
+
+void main() async {
   //final test_c = c_api.CamClientCAPI(); //storing as global variable
 
-  //runApp(MyApp());
+  runApp(MyApp());
 }
 
-class MyApp extends StatelessWidget {
+/*class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -38,7 +44,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void dispose() {
-    c_api.camClientCAPI.dispose(); //cleaning up c api
+    //c_api.camClientCAPI.dispose(); //cleaning up c api
     super.dispose();
   }
 
@@ -75,4 +81,4 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     );
   }
-}
+}*/

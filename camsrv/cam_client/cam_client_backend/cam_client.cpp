@@ -2,9 +2,11 @@
 
 #include <iostream>
 
-Cam_Client::Cam_Client(boost::asio::io_service &io_service, Connection_Callback conn_cb)
+Cam_Client::Cam_Client(boost::asio::io_service &io_service, Connection_Callback conn_cb,
+                       Image_Callback image_cb)
     : io_service(io_service),
       connection_callback{conn_cb},
+      image_callback{image_cb},
       socket(io_service),
       endpoint(boost::asio::ip::address::from_string("127.0.0.1"), 20000),
       timer(io_service) {
@@ -17,7 +19,7 @@ void Cam_Client::start_keepalive() {
     timer.async_wait([&](const boost::system::error_code &error) {
         if (!error) {
             if (socket.is_open()) {
-                std::cout << "client: sending keepalive" << std::endl;
+                // std::cout << "client: sending keepalive" << std::endl;
                 camsrv::camsrv_message cm;
                 cm.command = camsrv::camsrv_message::camsrv_command::KEEP_ALIVE;
 
@@ -41,7 +43,7 @@ void Cam_Client::start_keepalive() {
 void Cam_Client::start_async_connect() {
     socket.async_connect(endpoint, [&](const boost::system::error_code &error) {
         if (!error) {
-            std::cout << "connected successfully" << std::endl;
+            std::cout << "client: connected successfully" << std::endl;
             updated_connection_status(true);
 
             start_read();
@@ -74,7 +76,7 @@ void Cam_Client::start_read() {
 
                     switch (cm->command) {
                         case camsrv::camsrv_message::camsrv_command::IMAGE:
-                            std::cout << "client: received image" << std::endl;
+                            // std::cout << "client: received image" << std::endl;
 
                             boost::asio::async_read(
                                 socket, data_buffer, boost::asio::transfer_exactly(cm->size),
@@ -82,8 +84,18 @@ void Cam_Client::start_read() {
                                         std::size_t bytes_transferred) {
                                     if (!error) {
                                         if (bytes_transferred == cm->size) {
-                                            std::cout << "client: received image size of "
-                                                      << bytes_transferred << std::endl;
+                                            // std::cout << "client: received image size of "
+                                            // cd           << bytes_transferred << std::endl;
+
+                                            const std::uint8_t *data =
+                                                boost::asio::buffer_cast<const std::uint8_t *>(
+                                                    data_buffer.data());
+                                            std::vector<std::uint8_t> vec_data(
+                                                data,
+                                                data + (bytes_transferred / sizeof(std::uint8_t)));
+                                            assert(vec_data.size() ==
+                                                   bytes_transferred);  // sanity check
+                                            image_callback(vec_data);
                                             reset_buffers();
                                             start_read();
                                         } else {

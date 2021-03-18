@@ -7,10 +7,11 @@
 
 class Cam_Client {
     using Connection_Callback = std::function<void(bool)>;
-    using Image_Callback = std::function<void(int)>;
+    using Image_Callback = std::function<void(std::vector<std::uint8_t>)>;
 
 public:
-    Cam_Client(boost::asio::io_service &io_service, Connection_Callback conn_cb);
+    Cam_Client(boost::asio::io_service &io_service, Connection_Callback conn_cb,
+               Image_Callback image_cb);
 
 private:
     void reset();

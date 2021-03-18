@@ -9,7 +9,7 @@ enable_testing()
 
 include_directories(../..)
 
-set(cam_client_backend_SRC cam_client_backend.cpp cam_client.cpp)
+set(cam_client_backend_SRC include/dart_api_dl.c cam_client_backend.cpp cam_client.cpp)
 
 add_library(cam_client_backend SHARED ${cam_client_backend_SRC})
 target_link_libraries(cam_client_backend ${Boost_LIBRARIES} pthread)

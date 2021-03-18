@@ -1,105 +1,85 @@
 library c_api;
 
+import 'dart:isolate';
+
 import 'package:flutter/material.dart';
 import 'dart:ffi' as ffi;
+
+typedef StartWorkType = ffi.Void Function(ffi.Int64 port, ffi.Int64 port2);
+typedef StartWorkFunc = void Function(int port, int port2);
 
 //FFI signature for void function
 typedef Void_Function_FFI = ffi.Void Function();
 //Dart type definition for calling the C foreign function
 typedef Void_Function_C = void Function();
 
-////////////////////////////////////////////////////////////////////////
-typedef NativeCreateCamClient = ffi.Void Function(ffi.Int32);
-typedef NativeCreateCamClientType = ffi.Void Function(
-    ffi.Pointer<ffi.NativeFunction<NativeCreateCamClient>>);
-typedef CreateCamClientType = void Function(
-    ffi.Pointer<ffi.NativeFunction<NativeCreateCamClient>>);
-////////////////////////////////////////////////////////////////////////
-
 class CamClientCAPI extends ChangeNotifier {
-  ffi.DynamicLibrary _backend;
-  static const String _LIBRARY_NAME =
+  ffi.DynamicLibrary lib;
+  final String _LIBRARY_NAME =
       '/home/efsi/projects/dev/sisrover/repos/sisrover.git/camsrv/cam_client/cam_client_backend/build/libcam_client_backend.so';
 
-  static const String _CREATE_CAM_CLIENT_SYMBOL_NAME = 'create_cam_client';
-  static const String _DESTROY_CAM_CLIENT_SYMBOL_NAME = 'destroy_cam_client';
-  static const String _RUN_IO_SERVICE_SYMBOL_NAME = 'run_service';
+  dynamic initializeApi;
 
-  Void_Function_C _createCamClient;
-  Void_Function_C _destroyCamClient;
+  //connection port
+  ReceivePort connectionPort;
+  int connectionNativePort;
+
+  //image frames port
+  ReceivePort imagePort;
+  int imageNativePort;
+
+  StartWorkFunc cam;
   Void_Function_C runIOService;
-
-  ffi.Pointer<ffi.NativeFunction<NativeCreateCamClient>> _pointer3;
-  CreateCamClientType createc;
+  Void_Function_C cleanCam;
 
   CamClientCAPI() {
     camClientCAPI = this;
 
-    //try to open our dynamic library
-    //TODO find out more about this entire try/catch statement for dynamiclibrary
-    try {
-      //TODO this should always be in the same directory or something similar
-      _backend = ffi.DynamicLibrary.open(_LIBRARY_NAME);
-    } catch (e) {
-      print(e.toString()); //TODO find out if throw prints or this is needed
-      throw e;
-    }
-    assert(_backend != null); //sanity check
-    print("flutter: loaded " + _LIBRARY_NAME);
+    lib = ffi.DynamicLibrary.open(_LIBRARY_NAME);
 
-    try {
-      ffi.Pointer<ffi.NativeFunction<NativeCreateCamClientType>> pointer =
-          _backend.lookup(_CREATE_CAM_CLIENT_SYMBOL_NAME);
-      createc = pointer.asFunction();
-    } catch (e) {
-      throw e;
+    initializeApi = lib.lookupFunction<
+        ffi.IntPtr Function(ffi.Pointer<ffi.Void>),
+        int Function(ffi.Pointer<ffi.Void>)>("InitializeDartApi");
+
+    if (initializeApi(ffi.NativeApi.initializeApiDLData) != 0) {
+      throw "Failed to initialize Dart API";
     }
 
-    print("loaded symbol: " + _CREATE_CAM_CLIENT_SYMBOL_NAME);
+    connectionPort = ReceivePort()
+      ..listen((status) {
+        print('connection: status changed to $status');
+      });
+    connectionNativePort = connectionPort.sendPort.nativePort;
 
-    try {
-      _destroyCamClient = _backend
-          .lookup<ffi.NativeFunction<Void_Function_FFI>>(
-              _DESTROY_CAM_CLIENT_SYMBOL_NAME)
-          .asFunction();
-    } catch (e) {
-      throw e;
-    }
+    imagePort = ReceivePort()
+      ..listen((size) {
+        print('image: received frame size of ${size.length}');
+      });
+    imageNativePort = imagePort.sendPort.nativePort;
 
-    print("loaded symbol: " + _DESTROY_CAM_CLIENT_SYMBOL_NAME);
+    cam = lib
+        .lookup<ffi.NativeFunction<StartWorkType>>("create_cam_client")
+        .asFunction();
 
-    try {
-      runIOService = _backend
-          .lookup<ffi.NativeFunction<Void_Function_FFI>>(
-              _RUN_IO_SERVICE_SYMBOL_NAME)
-          .asFunction();
-    } catch (e) {
-      throw e;
-    }
+    runIOService = lib
+        .lookup<ffi.NativeFunction<Void_Function_FFI>>("run_service")
+        .asFunction();
 
-    print("loaded symbol: " + _RUN_IO_SERVICE_SYMBOL_NAME);
+    cleanCam = lib
+        .lookup<ffi.NativeFunction<Void_Function_FFI>>("destroy_cam_client")
+        .asFunction();
 
-    //_createCamClient(); //starting our backend
-
-    _pointer3 = ffi.Pointer.fromFunction(connection);
-
-    createc(_pointer3);
-
-    runIOService(); //starting the backends asynchronous service
+    cam(connectionNativePort, imageNativePort);
+    runIOService();
   }
 
+  @override
   void dispose() {
-    //TODO looks like we don't need to dispose
-    //_destroyCamClient();
+    print("attempting to dispose");
+    //cleanCam();
+    //print("cleaning cam");
+    super.dispose();
   }
 }
 
 CamClientCAPI camClientCAPI;
-
-void connection(int a) {
-  //dart has no true conversion to boolean
-  //can't make this a boolean function either because Dart doesn't support
-  //boolean callbacks between C
-  final bool s = (a == 0 ? false : true);
-  print("connection!!! $s");
-}
