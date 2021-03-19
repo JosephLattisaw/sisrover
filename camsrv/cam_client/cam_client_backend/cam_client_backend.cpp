@@ -55,7 +55,7 @@ void create_cam_client(int64_t connection_port, int64_t image_port) {
 // TODO find out if this is actually needed since we are using smart pointers
 void destroy_cam_client() {
     std::cout << "destroy cam client" << std::endl;
-    io_service.stop();
+    // io_service.stop();
     cam_client.reset();
 }
 

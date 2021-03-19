@@ -1,6 +1,7 @@
 library c_api;
 
 import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'dart:ffi' as ffi;
@@ -13,7 +14,7 @@ typedef Void_Function_FFI = ffi.Void Function();
 //Dart type definition for calling the C foreign function
 typedef Void_Function_C = void Function();
 
-class CamClientCAPI extends ChangeNotifier {
+class CamClientCAPI with ChangeNotifier {
   ffi.DynamicLibrary lib;
   final String _LIBRARY_NAME =
       '/home/efsi/projects/dev/sisrover/repos/sisrover.git/camsrv/cam_client/cam_client_backend/build/libcam_client_backend.so';
@@ -32,6 +33,15 @@ class CamClientCAPI extends ChangeNotifier {
   Void_Function_C runIOService;
   Void_Function_C cleanCam;
 
+  bool connected = false;
+  Uint8List image_data;
+
+  bool getConnected() => connected;
+
+  void increment() {
+    notifyListeners();
+  }
+
   CamClientCAPI() {
     camClientCAPI = this;
 
@@ -45,15 +55,21 @@ class CamClientCAPI extends ChangeNotifier {
       throw "Failed to initialize Dart API";
     }
 
+    void increment() {}
+
     connectionPort = ReceivePort()
       ..listen((status) {
         print('connection: status changed to $status');
+        connected = status;
+        notifyListeners();
       });
     connectionNativePort = connectionPort.sendPort.nativePort;
 
     imagePort = ReceivePort()
-      ..listen((size) {
-        print('image: received frame size of ${size.length}');
+      ..listen((data) {
+        //print('image: received frame size of ${size.length}');
+        image_data = data;
+        notifyListeners();
       });
     imageNativePort = imagePort.sendPort.nativePort;
 

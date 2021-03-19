@@ -47,7 +47,7 @@ find_required_libs(groupsock)
 find_required_libs(UsageEnvironment)
 find_required_libs(v4l2)
 
-find_package(Boost 1.74.0 COMPONENTS program_options)
+find_package(Boost 1.74.0 REQUIRED COMPONENTS program_options)
 
 add_definitions(-std=c++17)
 
