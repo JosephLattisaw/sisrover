@@ -1,8 +1,7 @@
 cmake_minimum_required(VERSION 3.0.0)
 project(cam_client_backend VERSION 0.1.0)
 
-find_package(Boost 1.74.0< REQUIRED COMPONENTS thread)
-find_package()
+find_package(Boost 1.74.0 REQUIRED COMPONENTS thread)
 
 add_definitions(-std=c++17)
 

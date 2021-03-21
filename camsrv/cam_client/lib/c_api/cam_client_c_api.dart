@@ -55,8 +55,6 @@ class CamClientCAPI with ChangeNotifier {
       throw "Failed to initialize Dart API";
     }
 
-    void increment() {}
-
     connectionPort = ReceivePort()
       ..listen((status) {
         print('connection: status changed to $status');
@@ -67,7 +65,6 @@ class CamClientCAPI with ChangeNotifier {
 
     imagePort = ReceivePort()
       ..listen((data) {
-        //print('image: received frame size of ${size.length}');
         image_data = data;
         notifyListeners();
       });

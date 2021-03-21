@@ -35,6 +35,10 @@ function(find_required_libs lib)
     endif()
 endfunction()
 
+find_package(Boost 1.74.0 REQUIRED COMPONENTS program_options)
+find_package(OpenCV 4.0.0 REQUIRED COMPONENTS core highgui imgproc imgcodecs)
+
+#includes needed for Cameras
 add_include_dir(liveMedia true) #liveMedia include directories
 add_include_dir(groupsock true) #groupsock include directories
 add_include_dir(UsageEnvironment true) #UsageEnvironment include directories
@@ -47,10 +51,8 @@ find_required_libs(groupsock)
 find_required_libs(UsageEnvironment)
 find_required_libs(v4l2)
 
-find_package(Boost 1.74.0 REQUIRED COMPONENTS program_options)
-
 add_definitions(-std=c++17)
 
 add_executable(camsrv main.cpp controller.cpp server.cpp ipcamera.cpp webcamera.cpp camera.cpp)
-target_link_libraries(camsrv ${Boost_LIBRARIES} pthread v4l2 liveMedia groupsock UsageEnvironment BasicUsageEnvironment)
+target_link_libraries(camsrv ${Boost_LIBRARIES} pthread v4l2 liveMedia groupsock UsageEnvironment BasicUsageEnvironment ${OpenCV_LIBS})
 

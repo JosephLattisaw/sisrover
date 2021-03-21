@@ -70,6 +70,8 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
 
+  Image lastImage;
+
   void _incrementCounter() {
     setState(() {
       // This call to setState tells the Flutter framework that something has
@@ -81,17 +83,22 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  Image load_data_image(Uint8List data) {
-    print('load_data_image called ${data.length}');
-    Image image = Image(image: MemoryImage(data));
-    print('image, width: ${image.width}, height: ${image.height}');
-    return image;
+  void load_data_image(Uint8List data) {
+    MemoryImage mi = MemoryImage(data);
+    Image image = Image(
+      image: mi,
+    );
+
+    setState(() {
+      lastImage = image;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     //final counter = Provider.of<Counter>(context);
     final counter = Provider.of<c_api.CamClientCAPI>(context);
+    load_data_image(counter.image_data);
     // This method is rerun every time setState is called, for instance as done
     // by the _incrementCounter method above.
     //
@@ -124,7 +131,7 @@ class _MyHomePageState extends State<MyHomePage> {
           // horizontal).
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            load_data_image(counter.image_data),
+            lastImage,
             Text(
               'You have pushed the button this many times:',
             ),

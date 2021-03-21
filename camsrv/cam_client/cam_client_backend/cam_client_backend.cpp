@@ -39,12 +39,14 @@ void create_cam_client(int64_t connection_port, int64_t image_port) {
         [image_port](std::vector<std::uint8_t> data) {
             void* request_buffer = malloc(sizeof(uint8_t) * data.size());
             const size_t request_length = sizeof(uint8_t) * data.size();
+            std::copy(data.begin(), data.end(), reinterpret_cast<std::uint8_t*>(request_buffer));
 
             Dart_CObject dart_object;
             dart_object.type = Dart_CObject_kExternalTypedData;
             dart_object.value.as_external_typed_data.type = Dart_TypedData_kUint8;
             dart_object.value.as_external_typed_data.length = request_length;
-            dart_object.value.as_external_typed_data.data = static_cast<uint8_t*>(request_buffer);
+            dart_object.value.as_external_typed_data.data =
+                reinterpret_cast<std::uint8_t*>(request_buffer);
             dart_object.value.as_external_typed_data.peer = request_buffer;
             dart_object.value.as_external_typed_data.callback = FreeFinalizer;
             Dart_PostCObject_DL(image_port, &dart_object);

@@ -1,6 +1,11 @@
 #include "server.hpp"
 
+// standard includes
 #include <iostream>
+
+// opencv include
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgcodecs.hpp>
 
 #include "camsrv_msg.hpp"
 
@@ -60,10 +65,11 @@ void Server::start_read() {
                             break;
                         case camsrv::camsrv_message::camsrv_command::KEEP_ALIVE:
                             std::cout << "server: received keepalive" << std::endl;
-                            timer.cancel();  // cancelling keep alive expiration TODO client should be getting keep alive not server
+                            timer.cancel();  // cancelling keep alive expiration TODO client should
+                                             // be getting keep alive not server
                             break;
                         case camsrv::camsrv_message::camsrv_command::IMAGE:
-                        default: //TODO this should be cerr
+                        default:  // TODO this should be cerr
                             std::cout << "server: received unknown command: "
                                       << static_cast<std::uint32_t>(cm->command) << std::endl;
                             // disconnecting socket from the server because unknown command was sent
@@ -102,7 +108,8 @@ void Server::reset_buffers() { message_buffer.consume(message_buffer.size()); }
 
 void Server::start_keepalive() {
     std::cout << "server: " << __PRETTY_FUNCTION__ << " called" << std::endl;
-    timer.expires_after(std::chrono::seconds(KEEP_ALIVE_TIMOUT_SECONDS)); //TODO fix spelling of timeout
+    timer.expires_after(
+        std::chrono::seconds(KEEP_ALIVE_TIMOUT_SECONDS));  // TODO fix spelling of timeout
     timer.async_wait([&](const boost::system::error_code& error) {
         if (error == boost::asio::error::operation_aborted && socket)
             start_keepalive();
@@ -118,11 +125,23 @@ void Server::start_keepalive() {
 void Server::send_frame(std::vector<std::uint8_t> image) {
     camsrv::camsrv_message cm;
     if (socket && socket->is_open()) {
-        std::cout << "server: sending frame of " << image.size() << " bytes" << std::endl;
+        // decoding mjpeg format
+        cv::Mat cvmat = cv::Mat(image);  // creating mat from image
+        cv::Mat decoded_image = cv::imdecode(cv::Mat(image), cv::IMREAD_COLOR);
+
+        // encoding as png format
+        std::vector<std::uint8_t> encoded_image;
+        cv::imencode(".png", decoded_image, encoded_image);
+
+        // creating commang to go across server
         cm.command = camsrv::camsrv_message::camsrv_command::IMAGE;
-        cm.size = static_cast<decltype(cm.size)>(image.size());
+        cm.size = static_cast<decltype(cm.size)>(encoded_image.size());
+
+        // sending image to socket
         boost::asio::write(*socket, boost::asio::buffer(reinterpret_cast<char*>(&cm), sizeof(cm)));
-        boost::asio::write(*socket, boost::asio::buffer(image.data(), image.size()));
+        boost::asio::write(*socket,
+                           boost::asio::buffer(reinterpret_cast<char*>(encoded_image.data()),
+                                               encoded_image.size()));
     } else
         std::cerr << "server: couldn't send frame of " << image.size()
                   << " bytes, not connected to server" << std::endl;
