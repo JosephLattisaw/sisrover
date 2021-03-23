@@ -23,6 +23,8 @@ static void FreeFinalizer(void*, void* value) {
     free(value);
 }
 
+void io_connection_post(bool status) {}
+
 // Wrappers are needed because of name mangling in C++
 // Dart performs a dynamic lookup and can't decipher the name otherwise
 extern "C" {
@@ -66,8 +68,20 @@ void destroy_cam_client() {
 // Boost's IO service is thread safe
 // TODO we need to make sure our application is completely thread safe
 void run_service() {
-    boost::thread t(boost::bind(&boost::asio::io_service::run, boost::ref(io_service)));
+    std::thread t([&] {
+        boost::asio::executor_work_guard<boost::asio::io_service::executor_type> work_guard(
+            io_service.get_executor());
+        io_service.run();
+    });
     t.detach();
+}
+
+void set_connection(uint8_t status) {
+    std::cout << "c set connection " << status << " called" << std::endl;
+    if (cam_client) {
+        std::cout << "inside if statement called" << std::endl;
+        io_service.post(std::bind(&Cam_Client::set_connection, std::ref(cam_client), status));
+    }
 }
 
 DART_EXPORT intptr_t InitializeDartApi(void* data) { return Dart_InitializeApiDL(data); }

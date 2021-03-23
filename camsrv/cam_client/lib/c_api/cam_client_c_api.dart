@@ -14,6 +14,9 @@ typedef Void_Function_FFI = ffi.Void Function();
 //Dart type definition for calling the C foreign function
 typedef Void_Function_C = void Function();
 
+typedef SetConnectionType = ffi.Void Function(ffi.Uint8 status);
+typedef SetConnectionFunc = void Function(int status);
+
 class CamClientCAPI {
   static const String _LIBRARY_NAME =
       '/home/efsi/projects/dev/sisrover/repos/sisrover.git/camsrv/cam_client/cam_client_backend/build/libcam_client_backend.so';
@@ -22,6 +25,8 @@ class CamClientCAPI {
 
   ValueNotifier<bool> connected;
   ValueNotifier<MemoryImage?> image;
+
+  late SetConnectionFunc _setConnection;
 
   Future<void> sendImage(Uint8List data) async {
     final imageMemory = MemoryImage(data);
@@ -36,6 +41,7 @@ class CamClientCAPI {
 
   void setConnection(bool status) {
     print("CamClientCAPI: setConnection($status)");
+    _setConnection(status ? 1 : 0);
   }
 
   CamClientCAPI(this.context, this.image, this.connected) {
@@ -75,6 +81,10 @@ class CamClientCAPI {
     //TODO see if we need this
     Void_Function_C cleanCam = lib
         .lookup<ffi.NativeFunction<Void_Function_FFI>>("destroy_cam_client")
+        .asFunction();
+
+    _setConnection = lib
+        .lookup<ffi.NativeFunction<SetConnectionType>>("set_connection")
         .asFunction();
 
     cam(connectionNativePort, imageNativePort);

@@ -13,6 +13,8 @@ public:
     Cam_Client(boost::asio::io_service &io_service, Connection_Callback conn_cb,
                Image_Callback image_cb);
 
+    void set_connection(bool status);
+
 private:
     void reset();
     void reset_buffers();
