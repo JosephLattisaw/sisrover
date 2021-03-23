@@ -19,6 +19,8 @@ class CamClientCAPI {
       '/home/efsi/projects/dev/sisrover/repos/sisrover.git/camsrv/cam_client/cam_client_backend/build/libcam_client_backend.so';
 
   BuildContext context;
+
+  ValueNotifier<bool> connected;
   ValueNotifier<MemoryImage?> image;
 
   Future<void> sendImage(Uint8List data) async {
@@ -32,7 +34,11 @@ class CamClientCAPI {
     } catch (ex) {}
   }
 
-  CamClientCAPI(this.context, this.image) {
+  void setConnection(bool status) {
+    print("CamClientCAPI: setConnection($status)");
+  }
+
+  CamClientCAPI(this.context, this.image, this.connected) {
     camClientCAPI = this;
 
     final lib = ffi.DynamicLibrary.open(_LIBRARY_NAME);
@@ -48,6 +54,7 @@ class CamClientCAPI {
     ReceivePort connectionPort = ReceivePort()
       ..listen((status) {
         print('connection: status changed to $status');
+        connected.value = status;
       });
     int connectionNativePort = connectionPort.sendPort.nativePort;
 

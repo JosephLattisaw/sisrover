@@ -35,6 +35,9 @@ class MyApp extends StatelessWidget {
 class MyHomePage extends HookWidget {
   @override
   Widget build(BuildContext context) {
+    final connected = useState<bool>(false);
+    final cam_client = useMemoized(() => Mjpeg(connected: connected));
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Flutter Demo Home Page'),
@@ -43,16 +46,16 @@ class MyHomePage extends HookWidget {
         children: [
           Expanded(
             child: Center(
-              child: Mjpeg(),
+              child: cam_client,
             ),
           ),
           Row(
             children: [
               ElevatedButton(
                 onPressed: () {
-                  //TODO
+                  cam_client.cam_client.setConnection(!connected.value);
                 },
-                child: Text('Toggle'),
+                child: Text(connected.value ? "Disconnect" : "Connect"),
               ),
               ElevatedButton(
                 onPressed: () {},
@@ -70,19 +73,26 @@ class Mjpeg extends HookWidget {
   final double? width;
   final double? height;
   final BoxFit? fit;
+  bool _currentConnectionStatus = false;
+  ValueNotifier<bool> connected;
 
-  const Mjpeg({
+  late c_api.CamClientCAPI cam_client;
+
+  Mjpeg({
     this.width,
     this.height,
     this.fit,
+    required this.connected,
     Key? key,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    //final connected = useState<bool>(false);
     final image = useState<MemoryImage?>(null);
     final errorState = useState<dynamic>(null);
-    final cam_client = useMemoized(() => c_api.CamClientCAPI(context, image));
+    cam_client =
+        useMemoized(() => c_api.CamClientCAPI(context, image, connected));
 
     if (image.value == null) {
       return SizedBox(
