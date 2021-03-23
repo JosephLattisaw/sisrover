@@ -14,40 +14,30 @@ typedef Void_Function_FFI = ffi.Void Function();
 //Dart type definition for calling the C foreign function
 typedef Void_Function_C = void Function();
 
-class CamClientCAPI with ChangeNotifier {
-  ffi.DynamicLibrary lib;
-  final String _LIBRARY_NAME =
+class CamClientCAPI {
+  static const String _LIBRARY_NAME =
       '/home/efsi/projects/dev/sisrover/repos/sisrover.git/camsrv/cam_client/cam_client_backend/build/libcam_client_backend.so';
 
-  dynamic initializeApi;
+  BuildContext context;
+  ValueNotifier<MemoryImage?> image;
 
-  //connection port
-  ReceivePort connectionPort;
-  int connectionNativePort;
+  Future<void> sendImage(Uint8List data) async {
+    final imageMemory = MemoryImage(data);
 
-  //image frames port
-  ReceivePort imagePort;
-  int imageNativePort;
-
-  StartWorkFunc cam;
-  Void_Function_C runIOService;
-  Void_Function_C cleanCam;
-
-  bool connected = false;
-  Uint8List image_data;
-
-  bool getConnected() => connected;
-
-  void increment() {
-    notifyListeners();
+    try {
+      await precacheImage(imageMemory, context, onError: (err, trace) {
+        print(err);
+      });
+      image.value = imageMemory;
+    } catch (ex) {}
   }
 
-  CamClientCAPI() {
+  CamClientCAPI(this.context, this.image) {
     camClientCAPI = this;
 
-    lib = ffi.DynamicLibrary.open(_LIBRARY_NAME);
+    final lib = ffi.DynamicLibrary.open(_LIBRARY_NAME);
 
-    initializeApi = lib.lookupFunction<
+    final initializeApi = lib.lookupFunction<
         ffi.IntPtr Function(ffi.Pointer<ffi.Void>),
         int Function(ffi.Pointer<ffi.Void>)>("InitializeDartApi");
 
@@ -55,44 +45,34 @@ class CamClientCAPI with ChangeNotifier {
       throw "Failed to initialize Dart API";
     }
 
-    connectionPort = ReceivePort()
+    ReceivePort connectionPort = ReceivePort()
       ..listen((status) {
         print('connection: status changed to $status');
-        connected = status;
-        notifyListeners();
       });
-    connectionNativePort = connectionPort.sendPort.nativePort;
+    int connectionNativePort = connectionPort.sendPort.nativePort;
 
-    imagePort = ReceivePort()
-      ..listen((data) {
-        image_data = data;
-        notifyListeners();
+    ReceivePort imagePort = ReceivePort()
+      ..listen((data) async {
+        await sendImage(data);
       });
-    imageNativePort = imagePort.sendPort.nativePort;
+    int imageNativePort = imagePort.sendPort.nativePort;
 
-    cam = lib
+    StartWorkFunc cam = lib
         .lookup<ffi.NativeFunction<StartWorkType>>("create_cam_client")
         .asFunction();
 
-    runIOService = lib
+    Void_Function_C runIOService = lib
         .lookup<ffi.NativeFunction<Void_Function_FFI>>("run_service")
         .asFunction();
 
-    cleanCam = lib
+    //TODO see if we need this
+    Void_Function_C cleanCam = lib
         .lookup<ffi.NativeFunction<Void_Function_FFI>>("destroy_cam_client")
         .asFunction();
 
     cam(connectionNativePort, imageNativePort);
     runIOService();
   }
-
-  @override
-  void dispose() {
-    print("attempting to dispose");
-    //cleanCam();
-    //print("cleaning cam");
-    super.dispose();
-  }
 }
 
-CamClientCAPI camClientCAPI;
+CamClientCAPI? camClientCAPI;
