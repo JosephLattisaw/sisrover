@@ -4,7 +4,9 @@ project(sis_quick_usb VERSION 0.1.0)
 include(CTest)
 enable_testing()
 
-add_definitions(-std=c++11)
+add_definitions(-std=c++17)
+
+include_directories(include/sis_quick_usb)
 
 add_library(sis_quick_usb sis_quick_usb.cpp)
 
