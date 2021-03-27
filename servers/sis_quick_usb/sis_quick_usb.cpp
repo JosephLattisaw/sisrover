@@ -8,6 +8,14 @@ namespace {
 const unsigned char POWERDAC = 0x03;
 const unsigned char DAC_ADDRESS[3] = {0x10, 0x11, 0x12};
 const unsigned char ADC_ADDRESS[3] = {0x48, 0x49, 0x4a};
+
+void print_dev_null_error() { std::cerr << "squsb: failed: device handle is null" << std::endl; }
+
+void print_last_error_message() {
+    QULONG ec;
+    QuickUsbGetLastError(&ec);
+    std::cerr << "squsb: last error code: " << ec << std::endl;
+}
 }  // namespace
 
 squsb::squsb::squsb() {}
@@ -136,16 +144,6 @@ bool squsb::squsb::write_quickusb_command(QWORD address, unsigned char* data, QW
     return false;
 }
 
-void squsb::squsb::print_last_error_message() {
-    QULONG ec;
-    QuickUsbGetLastError(&ec);
-    std::cerr << "squsb: last error code: " << ec << std::endl;
-}
-
-void squsb::squsb::print_dev_null_error() {
-    std::cerr << "squsb: failed: device handle is null" << std::endl;
-}
-
 std::tuple<bool, unsigned char> squsb::squsb::read_adc(QWORD address, unsigned char* data) {
     if (dev_handle == nullptr) {
         print_dev_null_error();
@@ -177,12 +175,20 @@ bool squsb::squsb::set_DAC(unsigned char dac, unsigned char channel, unsigned ch
     std::cout << "squsb: setting DAC " << static_cast<int>(dac) << " channel "
               << static_cast<int>(channel) << " value " << static_cast<int>(value) << std::endl;
 
-    unsigned char dat[] = {command_and_chan_val(POWERDAC, channel), value, 0};
-}
+    // get command and channel value
+    unsigned char cc = (POWERDAC << 4) | (channel & 0x0f);
 
-unsigned char squsb::squsb::command_and_chan_val(unsigned char cmd, unsigned chan) {
-    unsigned char ret = (cmd << 4) | (chan & 0x0f);
-    return ret;
+    unsigned char dat[] = {cc, value, 0};
+
+    if (dev_handle == nullptr)
+        print_dev_null_error();
+    else if (!QuickUsbWriteI2C(dev_handle, DAC_ADDRESS[dac], dat, sizeof(dat))) {
+        std::cerr << "squsb: failed to write dac value" << std::endl;
+        print_last_error_message();
+    } else
+        return true;
+
+    return false;
 }
 
 bool squsb::squsb::set_port_direction(int port, int direction) {

@@ -34,18 +34,13 @@ public:
     std::string get_version_number() const { return VERSION_NUMBER; }
 
 private:
-    // print helpers
-    void print_dev_null_error();
-    void print_last_error_message();
-
-    unsigned char command_and_chan_val(unsigned char cmd, unsigned chan);
-
+    // current parameter values kept by us
     char current_begin_serial_number;
     QLONG current_quick_usb_timeout;
 
-    QHANDLE dev_handle = nullptr;
+    QHANDLE dev_handle = nullptr;  // device handle to quickusb device
 
-    const std::string VERSION_NUMBER = "1.2.1";
+    const std::string VERSION_NUMBER = "1.2.1";  // version number of library
 };
 }  // namespace squsb
 
