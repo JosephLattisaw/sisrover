@@ -7,6 +7,7 @@ enable_testing()
 add_definitions(-std=c++17)
 find_package(Boost 1.74.0 REQUIRED COMPONENTS program_options)
 
+include_directories(../sis_quick_usb/include)
 add_executable(daqsrv main.cpp daq.cpp server.cpp controller.cpp)
 target_link_libraries(daqsrv ${Boost_LIBRARIES} sis_quick_usb pthread)
 

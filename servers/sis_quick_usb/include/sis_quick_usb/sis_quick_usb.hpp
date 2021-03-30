@@ -19,6 +19,10 @@ public:
     std::tuple<bool, unsigned char> read_fpga(QWORD address);
     bool write_fpga(QWORD address, char value);
 
+    // quickusb settings
+    std::tuple<bool, QWORD> read_quickusb_setting(QWORD address);
+    bool write_quickusb_setting(QWORD address, QWORD setting);
+
     // quickusb commands
     bool read_quickusb_command(QWORD address, unsigned char* destination, QWORD* length);
     bool write_quickusb_command(QWORD address, unsigned char* data, QWORD length);
