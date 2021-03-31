@@ -1,7 +1,15 @@
+// boost includes
+#include <boost/asio.hpp>
 #include <boost/program_options.hpp>
+
+// standard includes
 #include <iostream>
 
+// internal includes
+#include "daq.hpp"
 #include "defines.hpp"
+
+#undef HANDLE
 
 // TODO Options should be made into a library to match similarites in camsrv
 namespace {
@@ -124,15 +132,8 @@ void required_list_option_check(T value, std::list<T> accepted_values, std::stri
 int main(int argc, char **argv) {
     namespace prog_opts = boost::program_options;
 
-    std::uint16_t port_number;              // port number to be used for our tcp/ip server
-    std::uint16_t number_of_asics = 16;     // number of asics detector arm is using
-    std::uint16_t ms_buff = 119;            // upper 7 bits of ADDCNT
-    std::uint16_t sample_time = 4;          // sample time of PAREG register
-    std::uint16_t daq_version;              // version of daq we are using
-    std::uint16_t serial_number;            // serial number of quickusb board
-    std::uint32_t buffer_size = 122880;     // size of buffer to read data off quickusb board
-    std::uint16_t read_multiple = 1;        // read multiples of buffer size
-    std::uint32_t quickusb_timeout = 1000;  // timeout for quickusb requests
+    std::uint16_t port_number;  // port number to be used for our tcp/ip server
+    daqsrv::controller_options_type co;
 
     // getting our options values. NOTE: created a separate object only for readability
     auto hlp_hdl = get_option_handles(OPTIONS::HELP);
@@ -145,33 +146,35 @@ int main(int argc, char **argv) {
     auto tm_hdl = get_option_handles(OPTIONS::TEST_MODE);
     auto tm_desc = get_options_description(OPTIONS::TEST_MODE);
     auto noa_hdl = get_option_handles(OPTIONS::NUMBER_OF_ASICS);
-    auto noa_opt = prog_opts::value<decltype(number_of_asics)>(&number_of_asics)
-                       ->default_value(number_of_asics);
+    auto noa_opt = prog_opts::value<decltype(co.number_of_asics)>(&co.number_of_asics)
+                       ->default_value(co.number_of_asics);
     auto noa_desc = get_options_description(OPTIONS::NUMBER_OF_ASICS);
     auto mb_hdl = get_option_handles(OPTIONS::MS_BUFF);
-    auto mb_opt = prog_opts::value<decltype(ms_buff)>(&ms_buff)->default_value(ms_buff);
+    auto mb_opt = prog_opts::value<decltype(co.ms_buff)>(&co.ms_buff)->default_value(co.ms_buff);
     auto mb_desc = get_options_description(OPTIONS::MS_BUFF);
     auto st_hdl = get_option_handles(OPTIONS::SAMPLE_TIME);
-    auto st_opt = prog_opts::value<decltype(sample_time)>(&sample_time)->default_value(sample_time);
+    auto st_opt =
+        prog_opts::value<decltype(co.sample_time)>(&co.sample_time)->default_value(co.sample_time);
     auto st_desc = get_options_description(OPTIONS::SAMPLE_TIME);
     auto dv_hdl = get_option_handles(OPTIONS::DAQ_VERSION);
-    auto dv_opt = prog_opts::value<decltype(daq_version)>(&daq_version);
+    auto dv_opt = prog_opts::value<decltype(co.daq_version)>(&co.daq_version);
     auto dv_desc = get_options_description(OPTIONS::DAQ_VERSION);
     auto sn_hdl = get_option_handles(OPTIONS::SERIAL_NUMBER);
-    auto sn_opt = prog_opts::value<decltype(serial_number)>(&serial_number);
+    auto sn_opt = prog_opts::value<decltype(co.serial_number)>(&co.serial_number);
     auto sn_desc = get_options_description(OPTIONS::SERIAL_NUMBER);
     auto bs_hdl = get_option_handles(OPTIONS::BUFFER_SIZE);
-    auto bs_opt = prog_opts::value<decltype(buffer_size)>(&buffer_size)->default_value(buffer_size);
+    auto bs_opt =
+        prog_opts::value<decltype(co.buffer_size)>(&co.buffer_size)->default_value(co.buffer_size);
     auto bs_desc = get_options_description(OPTIONS::BUFFER_SIZE);
     auto rm_hdl = get_option_handles(OPTIONS::READ_MULTIPLE);
-    auto rm_opt =
-        prog_opts::value<decltype(read_multiple)>(&read_multiple)->default_value(read_multiple);
+    auto rm_opt = prog_opts::value<decltype(co.read_multiple)>(&co.read_multiple)
+                      ->default_value(co.read_multiple);
     auto rm_desc = get_options_description(OPTIONS::READ_MULTIPLE);
     auto ts_hdl = get_option_handles(OPTIONS::TEST_SERVER);
     auto ts_desc = get_options_description(OPTIONS::TEST_SERVER);
     auto to_hdl = get_option_handles(OPTIONS::TIMEOUT);
-    auto to_opt = prog_opts::value<decltype(quickusb_timeout)>(&quickusb_timeout)
-                      ->default_value(quickusb_timeout);
+    auto to_opt = prog_opts::value<decltype(co.quickusb_timeout)>(&co.quickusb_timeout)
+                      ->default_value(co.quickusb_timeout);
     auto to_desc = get_options_description(OPTIONS::TIMEOUT);
 
     // creating our options table
@@ -244,8 +247,16 @@ int main(int argc, char **argv) {
                                                          get_options_long_handle(OPTIONS::PORT));
 
     // getting required items that have multiple valid answers
-    required_list_option_check<decltype(sample_time)>(
-        sample_time, daqsrv::VALID_SAMPLE_TIMES, get_options_long_handle(OPTIONS::SAMPLE_TIME));
-    required_list_option_check<decltype(daq_version)>(
-        daq_version, daqsrv::VALID_DAQ_VERSIONS, get_options_long_handle(OPTIONS::DAQ_VERSION));
+    required_list_option_check<decltype(co.sample_time)>(
+        co.sample_time, daqsrv::VALID_SAMPLE_TIMES, get_options_long_handle(OPTIONS::SAMPLE_TIME));
+    required_list_option_check<decltype(co.daq_version)>(
+        co.daq_version, daqsrv::VALID_DAQ_VERSIONS, get_options_long_handle(OPTIONS::DAQ_VERSION));
+
+    boost::asio::io_service io_service;
+
+    auto daq = std::make_unique<DAQ>(port_number, co, io_service);
+
+    io_service.run();
+
+    return 0;
 }

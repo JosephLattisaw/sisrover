@@ -1,15 +1,27 @@
 #ifndef CONTROLLER_HPP
 #define CONTROLLER_HPP
 
-#include <memory>
+// boost includes
+#include <boost/asio.hpp>
+
+// sis quick usb includes
 #include <sis_quick_usb/sis_quick_usb.hpp>
+
+// standard includes
+#include <memory>
+
+// internal includes
+#include "daq_message_type.hpp"
+#include "defines.hpp"
 
 class Controller {
 public:
-    Controller(bool test_mode, char number_of_asics, unsigned int ms_buff, unsigned int sample_time,
-               unsigned int daq_version, unsigned int serial_number, unsigned int buffer_size,
-               unsigned int timeout, unsigned int read_multiple);
+    using Data_Callback = std::function<void(std::vector<std::uint8_t>)>;
+    Controller(daqsrv::controller_options_type &controller_options,
+               boost::asio::io_service &io_service, Data_Callback callback);
     ~Controller();
+
+    void update_settings(daqsrv::daq_settings_type daq_settings);
 
 private:
     // deciding to initializa which daq version api
@@ -21,6 +33,7 @@ private:
     void setup_daq();
     void set_default_quickusb_settings();
     void start_scanning();
+    void start_scan_timer(unsigned int seconds);
 
     // utility functions
     char get_pareg(unsigned int sample_time);
@@ -92,6 +105,13 @@ private:
     // utility mi/mo functions
     int mi_data_len;
     unsigned char mo_command_data[64];
+
+    boost::asio::io_service &io_service;
+    boost::asio::steady_timer timer;
+
+    std::stringstream test_data;
+
+    Data_Callback data_callback;
 };
 
 #endif

@@ -1,32 +1,47 @@
 #include "controller.hpp"
 
+// C includes
 #include <math.h>
 
+// standard includes
+#include <fstream>
 #include <iostream>
+#include <iterator>
 
+// internal includes
 #include "defines.hpp"
 
-Controller::Controller(bool tst_mo, char nbr_asics, unsigned int mb, unsigned int st,
-                       unsigned int dv, unsigned int ser_no, unsigned int buff_size,
-                       unsigned int timeout, unsigned int rm)
-    : test_mode(tst_mo),
-      quickusb_timeout(timeout),
-      daq_version(dv),
-      number_of_asics(nbr_asics),
-      buffer_size(buff_size),
-      ms_buff(mb),
-      sample_time(st),
-      read_multiple(rm) {
-    serial_number = std::to_string(ser_no).c_str()[0];
+Controller::Controller(daqsrv::controller_options_type &controller_options,
+                       boost::asio::io_service &io_service, Data_Callback callback)
+    : test_mode(controller_options.test_mode),
+      quickusb_timeout(controller_options.quickusb_timeout),
+      daq_version(controller_options.daq_version),
+      number_of_asics(controller_options.number_of_asics),
+      buffer_size(controller_options.buffer_size),
+      ms_buff(controller_options.ms_buff),
+      sample_time(controller_options.sample_time),
+      read_multiple(controller_options.read_multiple),
+      io_service(io_service),
+      timer(io_service),
+      data_callback{callback} {
+    serial_number = std::to_string(controller_options.serial_number).c_str()[0];
 
-    // TODO open and read data file
+    {
+        assert(test_data.str().length() == 0);  // sanity check
+        std::ifstream file("data.dat");
+        test_data << file.rdbuf();
+        verify_truth(test_data.str().length() > 0, __PRETTY_FUNCTION__, "failed to open data.dat");
+    }
 
     quickusb = std::make_shared<squsb::squsb>();
     std::cout << "controller: using sis_quick_usb version number: "
               << quickusb->get_version_number() << std::endl;
 }
 
-Controller::~Controller() {}
+Controller::~Controller() {
+    std::cout << "controller: disconnecting from QuickUsb" << std::endl;
+    quickusb->disconnect_from_qusb();
+}
 
 void Controller::connect_to_daq() {
     quickusb->connect_to_qusb(serial_number, quickusb_timeout);
@@ -193,25 +208,37 @@ void Controller::initialize_daq_version_2() {
 
 void Controller::start_scanning() {
     if (connected) {
-        unsigned char buff[buffer_size * read_multiple];
+        std::uint8_t buff[buffer_size * read_multiple];
         QULONG l = sizeof(buff);
         auto res = quickusb->read_data(&buff[0], &l);
 
         if (!test_mode) {
             if (res) {
-                // TODO send data
+                data_callback(std::move(
+                    std::vector<std::uint8_t>(buff, buff + (sizeof(buff) / sizeof(buff[0])))));
+                start_scan_timer(0);  // immediately post (the read will take a second or so)
                 return;
             } else
                 std::cout
                     << "controller: failed to successfully read quickusb data, adding delay of 1s"
                     << std::endl;
         } else {
-            // TODO send data
+            data_callback(
+                std::vector<std::uint8_t>((std::istream_iterator<std::uint8_t>(test_data)),
+                                          std::istream_iterator<std::uint8_t>()));
         }
 
-        // TODO start scanning?
+        // if we make it this far this fast, we want to hold off a bit for realism
+        start_scan_timer(1);
     } else
         std::cerr << "controller: start scanning requested but daq is not connected?" << std::endl;
+}
+
+void Controller::start_scan_timer(unsigned int seconds) {
+    timer.expires_after(std::chrono::seconds(seconds));
+    timer.async_wait([&](const boost::system::error_code &error) {
+        if (!error) start_scanning();
+    });
 }
 
 void Controller::verify_truth(bool truth, std::string function_name, std::string error) {
@@ -278,3 +305,24 @@ char Controller::get_pareg(unsigned int sample_time) {
 unsigned char Controller::three_bits(unsigned long from, int first_bit) {
     return (from >> first_bit) & 0x07;
 };
+
+void Controller::update_settings(daqsrv::daq_settings_type daq_settings) {
+    timer.cancel();  // cancelling timer
+
+    buffer_size = daq_settings.buffer_size;
+    ms_buff = daq_settings.ms_buff;
+    number_of_asics = daq_settings.number_of_asics;
+    quickusb_timeout = daq_settings.quickusb_timeout;
+    read_multiple = daq_settings.read_multiple;
+    sample_time = daq_settings.timing;
+
+    std::cout << "controller: received settings update" << std::endl;
+    std::cout << "controller: buffer_size: " << buffer_size
+              << ", ms_buff: " << static_cast<int>(ms_buff)
+              << ", number_of_asics: " << static_cast<int>(number_of_asics)
+              << ", qusb_timeout: " << quickusb_timeout << ", read_multiple: " << read_multiple
+              << ", sample_time: " << sample_time << std::endl;
+
+    setup_daq();
+    start_scan_timer(0);  // start scan timer immediately after settings update
+}

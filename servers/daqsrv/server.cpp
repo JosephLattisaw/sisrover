@@ -2,14 +2,11 @@
 
 #include <iostream>
 
-#include "daq_message_type.hpp"
-
-Server::Server(boost::asio::io_service& io_service, std::uint16_t p)
+Server::Server(boost::asio::io_service& io_service, std::uint16_t p, Settings_Callback callback)
     : io_service(io_service),
       acceptor(io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), p)),
-      port(p) {}
-
-Server::~Server() {}
+      port(p),
+      settings_callback{callback} {}
 
 void Server::start_async_accept() {
     assert(!temp_socket);  // sanity check
@@ -79,6 +76,11 @@ void Server::start_read() {
                                         if (message_buffer.size() ==
                                             sizeof(daqsrv::daq_settings_type)) {
                                             // TODO something with the settings
+                                            const daqsrv::daq_settings_type* ds =
+                                                boost::asio::buffer_cast<
+                                                    const daqsrv::daq_settings_type*>(
+                                                    message_buffer.data());
+                                            settings_callback(*ds);
                                             reset_buffers();
                                             start_read();
                                         } else {
