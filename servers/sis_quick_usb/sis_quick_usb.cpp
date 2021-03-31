@@ -110,6 +110,23 @@ std::tuple<bool, unsigned char> squsb::squsb::read_fpga(QWORD address) {
     return std::make_tuple(res, dat[0]);
 }
 
+std::tuple<bool, QWORD> squsb::squsb::read_quickusb_setting(QWORD address) {
+    QWORD stg;
+    bool res = false;
+
+    std::cout << "squsb: reading quickusb setting " << static_cast<int>(address) << std::endl;
+
+    if (dev_handle == nullptr)
+        print_dev_null_error();
+    else if (!QuickUsbReadSetting(dev_handle, address, &stg)) {
+        std::cerr << "squsb: failed to read QuickUsb read setting" << std::endl;
+        print_last_error_message();
+    } else
+        res = true;
+
+    return std::make_tuple(res, stg);
+}
+
 bool squsb::squsb::write_fpga(QWORD address, char value) {
     unsigned char dat[1];
     dat[1] = value;
@@ -212,6 +229,21 @@ bool squsb::squsb::write_port(unsigned short address, unsigned char* data, unsig
         print_dev_null_error();
     else if (!QuickUsbWritePort(dev_handle, address, data, length)) {
         std::cerr << "squsb: failed to write port value" << std::endl;
+        print_last_error_message();
+    } else
+        return true;
+
+    return false;
+}
+
+bool squsb::squsb::write_quickusb_setting(QWORD address, QWORD setting) {
+    std::cout << "squsb: writing quickusb setting " << static_cast<int>(setting) << " to address "
+              << static_cast<int>(address) << std::endl;
+
+    if (dev_handle == nullptr)
+        print_dev_null_error();
+    else if (!QuickUsbWriteSetting(dev_handle, address, setting)) {
+        std::cerr << "squsb: failed to write quickusb setting" << std::endl;
         print_last_error_message();
     } else
         return true;

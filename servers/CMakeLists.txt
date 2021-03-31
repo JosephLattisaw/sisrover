@@ -6,3 +6,4 @@ enable_testing()
 
 add_subdirectory(camsrv)
 add_subdirectory(sis_quick_usb)
+add_subdirectory(daqsrv)
